@@ -9,6 +9,9 @@ webcam.jpg
 *.jpg
 *.png
 
+# Anciens scripts et logiciels propriétaires (FDbus, pilotes EFDE) : jamais publiés
+archives/
+
 # Éditeurs et système
 .vscode/
 .idea/
