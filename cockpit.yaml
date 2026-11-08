@@ -1,0 +1,83 @@
+# Description du cockpit : quelles cartes, quelles commandes, sur quelles entrées.
+# Les numéros d'entrées sont ceux affichés par ./simcockpit-gui (numérotation SIOC).
+
+cards:
+  io32:                       # nom libre, utilisé plus bas
+    product: USB32I04AD       # EFDE IO32
+    # usb_port: "1-14"        # à préciser quand plusieurs cartes identiques sont branchées
+  mcp:
+    product: IOCard-MCP       # OpenCockpits MCP
+
+instruments:
+  transpondeur:
+    label: Transpondeur
+    card: io32
+    controls:
+      code:
+        type: octal_digits    # 4 molettes, chacune codée en binaire sur 3 entrées (bit 0 en premier)
+        inputs: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]
+      mode:
+        type: selector        # la 1re position active de la liste l'emporte
+        positions:            # (en ON, le contact STBY reste aussi fermé)
+          "ON": 12
+          STBY: 13
+        default: "OFF"        # aucune position active
+
+  mcp:
+    label: MCP (pilote automatique)
+    card: mcp
+    controls:
+      crs1:
+        type: encoder           # 1 changement d'état = 1 cran ; sens horaire = +
+        inputs: [4, 5]
+        min: 0
+        max: 359
+        wrap: true              # 359 → 0
+        display: CRS1
+        leading_zeros: true     # affiche 000, 045…
+      vitesse:
+        type: speed_encoder     # IAS en nœuds ou Mach en centièmes (78 = 0,78)
+        inputs: [0, 1]
+        toggle_input: 12        # bouton C/O
+        toggle_level: 0         # le bouton C/O vaut 0 quand on appuie
+        ias: [100, 340, 1]      # min, max, pas
+        mach: [10, 99, 1]       # Mach .10 à .99
+        altitude_from: altitude # C/O convertit IAS ↔ Mach à l'altitude affichée (ISA, QNH 1013)
+        display: IAS
+      cap:
+        type: encoder
+        inputs: [6, 7]
+        min: 0
+        max: 359
+        wrap: true
+        display: HDG
+        leading_zeros: true     # affiche 000, 045…
+      altitude:
+        type: encoder
+        inputs: [2, 3]
+        min: 0
+        max: 36000
+        step: 100
+        initial: 10000
+        display: ALT
+      vitesse_verticale:
+        type: encoder
+        inputs: [10, 11]
+        min: -6000
+        max: 6000
+        step: 100
+        invert: true            # molette vers DN = négatif
+        accel: [[0.06, 5], [0.15, 2]]
+        display: VS
+      crs2:
+        type: encoder
+        inputs: [8, 9]
+        min: 0
+        max: 359
+        wrap: true
+        display: CRS2
+        leading_zeros: true     # affiche 000, 045…
+      at_arm:
+        type: switch
+        input: 30
+        led: A/T ARM

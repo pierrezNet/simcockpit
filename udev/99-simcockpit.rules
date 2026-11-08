@@ -1,0 +1,7 @@
+# simcockpit : accès sans sudo aux cartes de cockpit, pour les membres du groupe plugdev.
+# Identification par fabricant (ces cartes ont toutes l'identifiant USB 0000:xxxx, peu fiable).
+# Installation :
+#   sudo cp udev/99-simcockpit.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload && sudo udevadm trigger
+KERNEL=="hidraw*", ATTRS{manufacturer}=="Manuel Velez*", MODE="0660", GROUP="plugdev"
+KERNEL=="hidraw*", ATTRS{manufacturer}=="EFDE*", MODE="0660", GROUP="plugdev"

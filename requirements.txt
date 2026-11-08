@@ -1,0 +1,4 @@
+# Interfaces graphiques (simcockpit-gui, cockpit-panel) et configuration YAML.
+# La couche matérielle et la ligne de commande n'utilisent que la bibliothèque standard.
+PySide6>=6.10
+PyYAML>=6.0

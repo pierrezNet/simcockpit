@@ -1,0 +1,16 @@
+# Environnement Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Données propres à une machine (rapports de test, photos de la webcam)
+reports/
+webcam.jpg
+*.jpg
+*.png
+
+# Éditeurs et système
+.vscode/
+.idea/
+*.swp
+.DS_Store
