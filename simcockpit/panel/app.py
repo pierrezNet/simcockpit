@@ -6,12 +6,16 @@ Lancement : .venv/bin/python -m simcockpit.panel [cockpit.yaml]
 import sys
 import time
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import (QApplication, QGridLayout, QHBoxLayout, QLabel, QListWidget,
-                               QMainWindow, QPushButton, QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtCore import QRectF, Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtWidgets import (QApplication, QCheckBox, QDoubleSpinBox, QGridLayout, QGroupBox,
+                               QHBoxLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
+                               QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
 
 from ..logic import config
+from ..hw import dme as dme_hw
 from ..logic.controls import Encoder, OctalDigits, Selector, SpeedEncoder, Switch
+from ..logic.dme_indicator import DmeIndicator
 from ..gui.qtenv import prepare
 from ..logic.engine import Engine
 
@@ -19,6 +23,149 @@ LCD = ("background:#111; color:#ffb000; font-family:monospace; font-size:56px;"
        " font-weight:bold; padding:6px 18px; border:2px solid #444; border-radius:6px;")
 POS_ON = "background:#2e9e44; color:white; font-weight:bold; padding:6px 14px; border-radius:4px;"
 POS_OFF = "background:#3a3f47; color:#9aa; padding:6px 14px; border-radius:4px;"
+
+
+class DmeScreen(QWidget):
+    """Écran du DME dessiné aux positions du vrai (relevées sur photos, en fraction de largeur).
+
+    Ligne du haut : 9 colonnes de caractères, distance calée à droite sur les colonnes 1-4,
+    texte sur les colonnes 6-9. Ligne du bas : voyants à leur place fixe.
+    """
+    TOP = [0.14, 0.21, 0.28, 0.35, None, 0.62, 0.70, 0.78, 0.86]   # centres des colonnes 1-9
+    LAMPS = {"1": 0.06, "2": 0.09, "3": 0.12, "WPT": 0.23, "NM": 0.33,
+             "HLD": 0.56, "KT": 0.66, "MIN": 0.76, "ID": 0.86}
+    ON, OFF, BG, DARK = QColor("#ffd8cf"), QColor(255, 216, 207, 28), QColor("#b3261e"), QColor("#24110f")
+
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(440, 120)
+        self.cells = [""] * 9          # caractère de chaque colonne
+        self.dot = None                # colonne suivie d'un point décimal
+        self.lit = set()
+        self.powered = True
+
+    def show(self, cells, dot, lit, powered=True):
+        self.cells, self.dot, self.lit, self.powered = cells, dot, set(lit), powered
+        self.update()
+
+    def paintEvent(self, _ev):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        p.setPen(QPen(QColor("#111"), 8))
+        p.setBrush(self.BG if self.powered else self.DARK)
+        p.drawRoundedRect(QRectF(4, 4, w - 8, h - 8), 8, 8)
+        if not self.powered:
+            return
+        big = QFont("monospace", 30, QFont.Bold)
+        p.setFont(big)
+        p.setPen(self.ON)
+        cw = 0.075 * w
+        for col, ch in enumerate(self.cells):
+            x = self.TOP[col]
+            if x is None or not ch:
+                continue
+            p.drawText(QRectF(x * w - cw / 2, 12, cw, 54), Qt.AlignCenter, ch)
+            if self.dot == col:
+                p.drawText(QRectF(x * w + cw * 0.18, 12, cw * 0.6, 54), Qt.AlignCenter, ".")
+        p.setFont(QFont("sans-serif", 9, QFont.Bold))
+        for name, x in self.LAMPS.items():
+            p.setPen(self.ON if name in self.lit else self.OFF)
+            p.drawText(QRectF(x * w - 22, 76, 44, 22), Qt.AlignCenter, name)
+        p.end()
+
+
+def dme_cells(ctrl):
+    """État de l'indicateur → (9 caractères, colonne du point, voyants allumés)."""
+    left, right, lit = ctrl.fields()
+    cells, dot = [""] * 9, None
+    if left is None:
+        cells[1:4] = list("---")
+    else:
+        if left < dme_hw.TENTHS_BELOW_NM:            # dixième affiché, point après l'unité
+            digits = str(round(left * 10))
+            digits = digits.rjust(2, "0")
+            dot = 3 - 1
+        else:                                        # entier tronqué au-delà de 200 NM
+            digits = str(int(left))
+        digits = digits[-4:]
+        cells[4 - len(digits):4] = list(digits)
+    if right is None:
+        cells[6:9] = list("---")
+    else:
+        text = right.ljust(4) if ctrl.mode == "ID" else right.rjust(4)
+        cells[5:9] = list(text[:4])
+    return cells, dot, [x for x in lit.values() if x]
+
+
+class DmeWidget(QWidget):
+    """Réplique de l'écran du DME, boutons virtuels et données simulées (en attendant X-Plane)."""
+
+    def __init__(self, ctrl):
+        super().__init__()
+        self.ctrl = ctrl
+        lay = QVBoxLayout(self)
+        title = QLabel(f"<b>{ctrl.name}</b> <span style='color:#888'>— {ctrl.describe()}</span>")
+        title.setWordWrap(True)
+        lay.addWidget(title)
+        self.screen = DmeScreen()
+        lay.addWidget(self.screen)
+
+        row = QHBoxLayout()
+        for text, fn, tip in (("SEL", ctrl.press_sel, "ID → KT → MIN"),
+                              ("PWR", ctrl.toggle_power, "marche / arrêt")):
+            b = QPushButton(text)
+            b.setToolTip(tip)
+            b.clicked.connect(fn)
+            row.addWidget(b)
+        row.addStretch()
+        lay.addLayout(row)
+
+        sim = QGroupBox("Simulateur (en attendant X-Plane)")
+        g = QGridLayout(sim)
+        self.signal = QCheckBox("signal DME reçu")
+        self.signal.setChecked(True)
+        self.dist = QDoubleSpinBox(decimals=1, maximum=999.9, singleStep=0.1, value=3.2,
+                                   suffix=" NM")
+        self.gs = QSpinBox(maximum=999, value=240, suffix=" kt")
+        self.ident = QLineEdit("LIL")
+        self.ident.setMaxLength(4)
+        self.fly = QCheckBox("voler vers la station")
+        self.fly.setToolTip("la distance diminue selon la vitesse sol")
+        g.addWidget(self.signal, 0, 0, 1, 2)
+        g.addWidget(QLabel("Distance"), 1, 0)
+        g.addWidget(self.dist, 1, 1)
+        g.addWidget(QLabel("Vitesse sol"), 2, 0)
+        g.addWidget(self.gs, 2, 1)
+        g.addWidget(QLabel("Identifiant"), 3, 0)
+        g.addWidget(self.ident, 3, 1)
+        g.addWidget(self.fly, 4, 0, 1, 2)
+        lay.addWidget(sim)
+        for w, sig in ((self.signal, "toggled"), (self.dist, "valueChanged"),
+                       (self.gs, "valueChanged"), (self.ident, "textChanged")):
+            getattr(w, sig).connect(self._push)
+        self._fly_timer = QTimer(self, interval=1000, timeout=self._fly_step)
+        self.fly.toggled.connect(lambda on: self._fly_timer.start() if on else self._fly_timer.stop())
+        self._push()
+
+    def _push(self, *_):
+        on = self.signal.isChecked()
+        self.ctrl.set_sim(distance=self.dist.value() if on else None,
+                          groundspeed=self.gs.value() if on else None,
+                          ident=self.ident.text() if on else "")
+        self.show_value(None)
+
+    def _fly_step(self):
+        self.dist.setValue(max(0.0, self.dist.value() - self.gs.value() / 3600))
+
+    def show_value(self, _value):
+        c = self.ctrl
+        if not c.powered:
+            self.screen.show([""] * 9, None, [], powered=False)
+        elif c.testing:                              # test des segments : tout allumé
+            self.screen.show(list("8888 8888"), None, DmeScreen.LAMPS)
+        else:
+            self.screen.show(*dme_cells(c))
 
 
 class ControlWidget(QWidget):
@@ -133,7 +280,7 @@ class PanelWindow(QMainWindow):
             outer.addWidget(QLabel(f"<i>carte « {inst.card} » ({cockpit.cards[inst.card].product})</i>"))
             lay = QGridLayout()
             for k, (name, ctrl) in enumerate(inst.controls.items()):
-                w = ControlWidget(ctrl)
+                w = DmeWidget(ctrl) if isinstance(ctrl, DmeIndicator) else ControlWidget(ctrl)
                 lay.addWidget(w, k // 3, k % 3)
                 self.widgets[(inst.id, name)] = w
             outer.addLayout(lay)

@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, Q
                                QVBoxLayout,
                                QWidget)
 
-from ..hw import mastercard, mcp
+from ..hw import dme, mastercard, mcp
 from ..hw.device import Card
 
 ACTIVE = "#2e9e44"       # vert : entrée actionnée
@@ -84,14 +84,18 @@ class CardView(QWidget):
         self.cells = []
         # Master/EFDE : 8 groupes de 9 entrées ; MCP (bitmap) : 8 octets de 8 bits
         per_row, row_name = (8, "octet") if detected.type.protocol == "bitmap" else (9, "groupe")
-        for row in range(8):
-            grid.addWidget(QLabel(f"{row_name} {row}"), row, 0)
-            for b in range(per_row):
+        n_inputs = min(detected.type.inputs, mastercard.INPUTS)
+        for row in range(-(-n_inputs // per_row)):
+            is_dme = detected.type.protocol == "dme"
+            grid.addWidget(QLabel("SEL, PWR" if is_dme else f"{row_name} {row}"), row, 0)
+            for b in range(min(per_row, n_inputs - per_row * row)):
                 i = per_row * row + b
                 cell = Cell(str(i))
                 cell.setToolTip(f"Entrée {i} ({row_name} {row}, bit {b})")
                 grid.addWidget(cell, row, b + 1)
                 self.cells.append(cell)
+        if detected.type.protocol == "dme":
+            box.setTitle("Boutons : entrée 0 = SEL, entrée 1 = PWR")
         top.addWidget(box)
 
         side = QVBoxLayout()
@@ -231,6 +235,9 @@ class CardView(QWidget):
             mlay.addWidget(note)
             side.addWidget(mbox)
 
+        if detected.type.out_protocol == "dme":
+            side.addWidget(self._build_dme())
+
         # --- journal
         side.addWidget(QLabel("Journal"))
         self.log = QListWidget()
@@ -238,6 +245,129 @@ class CardView(QWidget):
 
         self.status = QLabel()
         root.addWidget(self.status)
+
+    def _build_dme(self):
+        """Écran et voyants du DME EFDE."""
+        self.dme_out = dme.DmeOutputs()
+        box = QGroupBox("Écran et voyants du DME")
+        lay = QVBoxLayout(box)
+        form = QGridLayout()
+        self.dme_dist = QLineEdit()
+        self.dme_dist.setPlaceholderText("ex. 3.2 (NM)")
+        self.dme_right = QLineEdit()
+        self.dme_right.setMaxLength(4)
+        self.dme_right.setPlaceholderText("ex. LIL (4 car.)")
+        for f in (self.dme_dist, self.dme_right):
+            f.returnPressed.connect(self._send_dme_texts)
+        form.addWidget(QLabel("Distance (NM)"), 0, 0)
+        form.addWidget(self.dme_dist, 0, 1)
+        form.addWidget(QLabel("Texte à droite"), 1, 0)
+        form.addWidget(self.dme_right, 1, 1)
+        b = QPushButton("Afficher")
+        b.clicked.connect(self._send_dme_texts)
+        form.addWidget(b, 0, 2, 2, 1)
+        lay.addLayout(form)
+
+        titles = {"canal": "Voyant", "unite_gauche": "Sous la distance",
+                  "unite_droite": "Sous le texte"}
+        self.dme_groups = {}
+        for group, (_, _, values) in dme.ANNUNCIATORS.items():
+            row = QHBoxLayout()
+            row.addWidget(QLabel(titles[group]))
+            buttons = []
+            for label in values:
+                lb = QPushButton(label)
+                lb.setCheckable(True)
+                lb.setStyleSheet("QPushButton:checked { background:#2e9e44; color:white;"
+                                 " font-weight:bold; }")
+                lb.clicked.connect(lambda on, g=group, l=label: self._set_dme_annunciator(
+                    g, l if on else None))
+                row.addWidget(lb)
+                buttons.append(lb)
+            row.addStretch()
+            lay.addLayout(row)
+            self.dme_groups[group] = buttons
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Rétroéclairage"))
+        self.dme_auto = QCheckBox("cellule photo")
+        self.dme_auto.setChecked(True)
+        self.dme_level = QSpinBox()
+        self.dme_level.setRange(1, 255)
+        self.dme_level.setValue(255)
+        self.dme_level.setEnabled(False)
+        self.dme_auto.toggled.connect(lambda on: (self.dme_level.setEnabled(not on),
+                                                  self._send_dme_backlight()))
+        self.dme_level.valueChanged.connect(self._send_dme_backlight)
+        row.addWidget(self.dme_auto)
+        row.addWidget(self.dme_level)
+        row.addStretch()
+        lay.addLayout(row)
+
+        row = QHBoxLayout()
+        for text, fn in (("Effacer l'écran", self._dme_clear),
+                         ("Éteindre le DME", lambda: self._dme_cmd(dme.OFF, "DME éteint")),
+                         ("Allumer (test des segments)",
+                          lambda: self._dme_cmd(dme.ON, "DME allumé")),
+                         ("Exemple : 3.2 NM LIL", self._dme_demo)):
+            b = QPushButton(text)
+            b.clicked.connect(fn)
+            row.addWidget(b)
+        row.addStretch()
+        lay.addLayout(row)
+        return box
+
+    def _dme_send(self, frames, what):
+        try:
+            for f in frames:
+                self._write(f)
+        except (OSError, ValueError) as e:
+            self._log(f"DME : {e}")
+            return False
+        self._log(f"DME : {what}")
+        return True
+
+    def _send_dme_texts(self):
+        text = self.dme_dist.text().strip().replace(",", ".")
+        try:
+            dist = float(text) if text else None
+            frames = [dme.distance(dist)] if dist is not None else []
+            frames.append(dme.right_text(self.dme_right.text()))
+        except ValueError as e:
+            self._log(f"DME : {e}")
+            return
+        if self._dme_send(frames, f"distance {text or '-'}, texte « {self.dme_right.text()} »"):
+            self.dme_out.distance, self.dme_out.right = dist, self.dme_right.text()
+
+    def _set_dme_annunciator(self, group, label):
+        for b in self.dme_groups[group]:
+            b.setChecked(b.text() == label)
+        if self._dme_send([dme.annunciator(group, label)], f"{group} = {label or 'éteint'}"):
+            self.dme_out.lit[group] = label
+
+    def _send_dme_backlight(self):
+        level = None if self.dme_auto.isChecked() else self.dme_level.value()
+        if self._dme_send([dme.backlight(level)],
+                          f"rétroéclairage {'cellule photo' if level is None else level}"):
+            self.dme_out.backlight = level
+
+    def _dme_cmd(self, function, what):
+        self._dme_send([dme.command(function)], what)
+
+    def _dme_clear(self):
+        if self._dme_send([dme.command(dme.CLEAR)], "écran effacé"):
+            self.dme_out = dme.DmeOutputs()
+            for buttons in self.dme_groups.values():
+                for b in buttons:
+                    b.setChecked(False)
+
+    def _dme_demo(self):
+        self.dme_dist.setText("3.2")
+        self.dme_right.setText("LIL")
+        self._dme_clear()
+        self._send_dme_texts()
+        for group, label in (("canal", "1"), ("unite_gauche", "NM"), ("unite_droite", "ID")):
+            self._set_dme_annunciator(group, label)
 
     def _build_passive(self):
         """Carte d'un fabricant connu mais modèle non pris en charge : trames brutes seulement."""

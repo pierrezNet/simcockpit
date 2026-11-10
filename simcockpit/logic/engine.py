@@ -5,7 +5,8 @@ une capture. `connect` / `step` gèrent les vraies cartes.
 
 Sorties : une commande liée à un afficheur (`display:`) ou à un voyant (`led:`) met à
 jour l'état de sortie de sa carte ; les trames sont ensuite envoyées une à une, espacées
-d'au moins WRITE_GAP (le MCP ignore les trames trop rapprochées).
+d'au moins WRITE_GAP (le MCP ignore les trames trop rapprochées). Une commande peut aussi
+produire elle-même ses trames (`take_frames`, ex. l'indicateur DME).
 """
 
 import queue
@@ -35,7 +36,7 @@ class Engine:
         # état des sorties par carte (seul le protocole MCP est géré pour l'instant)
         self.outputs = {cid: mcp.McpOutputs() for cid, spec in cockpit.cards.items()
                         if classify(spec.product).out_protocol == "mcp"}
-        self._pending = {cid: {} for cid in self.outputs}   # clé de trame -> trame
+        self._pending = {cid: {} for cid in cockpit.cards}  # clé de trame -> trame, dans l'ordre
         self._last_write = {}
 
     # ------------------------------------------------------------ cœur, sans matériel
@@ -55,6 +56,12 @@ class Engine:
                 if v is not None:
                     changes.append(Change(inst.id, name, v, t))
                     self._apply_output(inst.card, ctrl, v)
+                take = getattr(ctrl, "take_frames", None)   # commandes qui produisent leurs trames (DME)
+                if take is not None:
+                    pending = self._pending[inst.card]
+                    for key, frame in take():
+                        pending.pop(key, None)              # une trame plus récente passe en dernier
+                        pending[key] = frame
         return changes
 
     def _apply_output(self, card_id, ctrl, value):
@@ -83,6 +90,12 @@ class Engine:
 
     def resend_all(self, card_id):
         """Remet toutes les sorties d'une carte en file (ex. après (re)connexion)."""
+        self._pending[card_id].clear()                      # trames périmées
+        for inst in self.cockpit.instruments.values():
+            if inst.card == card_id:
+                for ctrl in inst.controls.values():
+                    if hasattr(ctrl, "restart"):
+                        ctrl.restart(cold=True)             # le DME refait sa mise sous tension
         out = self.outputs.get(card_id)
         if out is not None:
             p0, p1 = out.display_frames()

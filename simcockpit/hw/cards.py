@@ -18,7 +18,8 @@ class CardType:
     outputs: int
     axes: int
     max_cards: int = 1       # Master Cards derrière une USB Expansion
-    send_init: bool = True   # False = écoute passive uniquement
+    send_init: bool = True   # False = écoute passive uniquement (rien n'est écrit)
+    init: bool = True        # False = la carte émet sans trame d'initialisation
     verified: str = ""
     displays: int = 0        # positions de chiffres 7 segments pilotables (0 = aucune)
     out_protocol: str = ""   # protocole de sortie spécifique (ex. « mcp ») ; vide = Master
@@ -55,12 +56,24 @@ OC_MCP = CardType(
     verified="entrées ; 6 afficheurs et 15 LED (protocole MCP, validé à la webcam)",
 )
 
+EFDE_DME = CardType(
+    key="efde_dme",
+    label="EFDE DME",
+    products=("DME USB",),
+    protocol="dme",            # vérifié : octet 0 = 0x01 SEL, 0x02 PWR ; écran : hw/dme.py
+    active_level=1,
+    inputs=2, outputs=0, axes=0,
+    init=False,                # vérifié : émet sans initialisation
+    out_protocol="dme",
+    verified="boutons SEL et PWR ; écran et voyants (protocole EFDE, validé à la webcam)",
+)
+
 UNKNOWN = CardType(
     key="unknown", label="Carte inconnue", products=(), protocol="unknown",
     active_level=1, inputs=0, outputs=0, axes=0, send_init=False,
 )
 
-KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP)
+KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME)
 
 
 def classify(product: str) -> CardType:

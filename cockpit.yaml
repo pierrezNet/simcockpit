@@ -7,6 +7,8 @@ cards:
     # usb_port: "1-14"        # à préciser quand plusieurs cartes identiques sont branchées
   mcp:
     product: IOCard-MCP       # OpenCockpits MCP
+  dme:
+    product: DME USB          # EFDE DME (indicateur Collins IND-42C)
 
 instruments:
   transpondeur:
@@ -81,3 +83,13 @@ instruments:
         type: switch
         input: 30
         led: A/T ARM
+
+  dme:
+    label: DME (Collins IND-42C)
+    card: dme
+    controls:
+      indicateur:
+        type: dme_indicator     # SEL : ID → KT → MIN ; PWR : marche/arrêt
+        channel: 1              # IND-42C : canal fixé par câblage (1, 2 ou 3)
+        self_test: 2.0          # durée du test des segments à la mise sous tension (s)
+        # backlight: 200        # rétroéclairage fixe 1-255 ; sans cette ligne : cellule photo

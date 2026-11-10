@@ -1,3 +1,4 @@
 #!/bin/sh
-# Lance la fenêtre de test des cartes (simcockpit)
+# Lance la fenêtre de test des cartes (simcockpit).
+# --dev : relance automatique à chaque modification du code.
 cd "$(dirname "$0")" && exec .venv/bin/python -m simcockpit.gui "$@"

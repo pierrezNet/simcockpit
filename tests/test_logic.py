@@ -48,7 +48,7 @@ class TestControls(unittest.TestCase):
 class TestConfig(unittest.TestCase):
     def test_project_file_loads(self):
         ck = config.load(os.path.join(ROOT, "cockpit.yaml"))
-        self.assertEqual(list(ck.instruments), ["transpondeur", "mcp"])
+        self.assertEqual(list(ck.instruments), ["transpondeur", "mcp", "dme"])
         self.assertEqual(ck.cards["io32"].product, "USB32I04AD")
 
     def test_errors(self):

@@ -239,6 +239,8 @@ TYPES = {c.type: c for c in (OctalDigits, Selector, Switch, Encoder, SpeedEncode
 
 
 def make(name, spec):
+    from .dme_indicator import DmeIndicator   # ici : ce module importe Control
+    TYPES.setdefault(DmeIndicator.type, DmeIndicator)
     spec = dict(spec)
     kind = spec.pop("type", None)
     if kind not in TYPES:

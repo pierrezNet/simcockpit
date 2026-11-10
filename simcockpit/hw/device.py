@@ -5,7 +5,7 @@ import threading
 import time
 from dataclasses import dataclass
 
-from . import bitmap, mastercard
+from . import bitmap, dme, mastercard
 from .cards import CardType
 from .debounce import Debouncer
 from .hidraw import HidDevice, HidInfo
@@ -48,7 +48,7 @@ class Card:
     def start(self):
         passive = not self.type.send_init
         self.dev = HidDevice(self.info.path, writable=not passive)
-        if not passive:
+        if not passive and self.type.init:
             self.dev.write(mastercard.init_packet(ncards=1, naxes=self.type.axes))
         self._thread = threading.Thread(target=self._run, name=self.name, daemon=True)
         self._thread.start()
@@ -87,6 +87,14 @@ class Card:
                             self.debouncer.update(self.decoder.inputs(), t)
                             if self.state_events:
                                 self._emit("state", value=self.decoder.inputs())
+                    elif self.type.protocol == "dme":
+                        pressed = dme.buttons(pkt)
+                        state = pressed + [0] * (mastercard.INPUTS - len(pressed))
+                        self.debouncer.update(state, t)
+                        # le DME émet toutes les 3 ms : état transmis seulement s'il change
+                        if self.state_events and pressed != getattr(self, "_dme_last", None):
+                            self._dme_last = pressed
+                            self._emit("state", value=state)
                 for i, old, new in self.debouncer.poll(t):
                     if old is not None:
                         self._emit("input", index=i, value=new, old=old)

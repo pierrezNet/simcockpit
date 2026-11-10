@@ -21,6 +21,7 @@ officiel d'OpenCockpits, qui ne fonctionne que sous Windows.
 |---|---|---|---|
 | EFDE IO32 | `USB32I04AD` | ✅ 32 entrées, 4 axes | ✅ 32 sorties (testée sur une seule) |
 | OpenCockpits MCP (pilote automatique 737) | `IOCard-MCP` | ✅ boutons, interrupteurs, 6 encodeurs | ✅ 6 afficheurs, 15 voyants, point décimal |
+| EFDE DME (réplique Collins IND-42) | `DME USB` | ✅ boutons SEL et PWR | ✅ distance, texte, 9 voyants, rétroéclairage, marche/arrêt |
 | OpenCockpits USB Expansion + Master Card | `IOCardUSB` | ✅ 72 entrées (la Master Card doit être alimentée) | ⚠️ codage connu, non testé |
 
 Une carte d'un de ces fabricants dont le modèle est inconnu est quand même détectée.
@@ -61,6 +62,8 @@ Un onglet par carte détectée :
   n'est pas cochée.
 
 Pour le MCP, l'onglet propose aussi un champ par afficheur et un bouton par voyant.
+Pour le DME, il propose la distance, le texte de droite, les voyants, le rétroéclairage
+et la mise en marche ou l'arrêt.
 
 ### Panneau virtuel (logique du cockpit)
 
@@ -76,6 +79,17 @@ configuration ».
 
 > Les afficheurs du MCP ne restent allumés **que tant qu'un programme lit la carte**.
 > Gardez donc `cockpit-panel` ou `simcockpit-gui` ouvert.
+
+### Mode développement
+
+```sh
+./simcockpit-gui --dev
+./cockpit-panel --dev [autre.yaml]
+```
+
+La fenêtre se relance d'elle-même dès qu'un fichier Python du projet est enregistré (et,
+pour le panneau, un fichier YAML). Si le programme plante, il est relancé à la correction
+suivante. Fermer la fenêtre arrête tout.
 
 ### Ligne de commande
 
@@ -126,6 +140,7 @@ instruments:
 | `octal_digits` | chiffres codés en binaire sur 3 entrées (transpondeur) | `inputs` |
 | `encoder` | encodeur rotatif | `inputs`, `min`, `max`, `step`, `wrap`, `invert`, `initial`, `accel` |
 | `speed_encoder` | vitesse avec bascule IAS / Mach (bouton C/O) | `toggle_input`, `toggle_level`, `ias`, `mach`, `altitude_from` |
+| `dme_indicator` | indicateur DME Collins IND-42C sur le DME EFDE | `channel`, `self_test`, `backlight` |
 
 Options communes à tous les types : `display` (afficheur), `led` (voyant), `leading_zeros`.
 
@@ -138,6 +153,13 @@ Options communes à tous les types : `display` (afficheur), `led` (voyant), `lea
 - **`speed_encoder` :** avec `altitude_from`, le bouton C/O convertit la vitesse indiquée
   en Mach à l'altitude affichée (atmosphère standard, QNH 1013, vent nul), et
   inversement. Le Mach s'affiche `.78` sur le MCP.
+
+- **`dme_indicator` :** à la mise sous tension, test des segments puis distance (NM) et
+  identifiant de la station (ID). SEL fait défiler ID → KT (vitesse sol) → MIN (temps
+  jusqu'à la station) ; PWR allume et éteint ; sans signal, des tirets. Le canal (voyant
+  1, 2 ou 3) est fixe, comme sur l'IND-42C. Le HLD de l'avion (appui long sur SEL) n'est
+  pas repris : le bouton du DME EFDE ne transmet pas la durée d'appui. En attendant
+  X-Plane, le panneau virtuel simule la distance, la vitesse sol et l'identifiant.
 
 ## Protocoles
 
@@ -176,6 +198,25 @@ haute).
 
 Codes des chiffres : 0 à 9 ; `a` = chiffre éteint ; `b` = signe moins.
 
+**DME EFDE** (protocole communiqué par EFDE, vérifié à la webcam). Le DME émet sans
+initialisation, même éteint ; l'octet 0 vaut `01` tant que SEL est enfoncé, `02` pour
+PWR, `0a` au repos. PWR éteint et rallume l'écran de lui-même. En
+écriture, l'octet 0 désigne la fonction :
+
+| Fonction | Rôle | Paramètres |
+|---|---|---|
+| `01` | distance à gauche | octets 1-2 : dixièmes de NM ; dixième affiché sous 200 NM, entier au-delà |
+| `02` | texte à droite (identifiant de balise) | octets 1-4 : 4 caractères ASCII |
+| `03` | voyant 1, 2 ou 3 | octet 7 : 1 à 3, 0 = éteint |
+| `04` | WPT ou NM | octet 5 : 1 = WPT, 2 = NM, 0 = éteint |
+| `05` | HLD, KT, MIN ou ID | octet 6 : 1 à 4, 0 = éteint |
+| `06` | texte libre | octet 1 : colonne 1 à 9 ; octets 2-5 : 4 caractères |
+| `07` | efface l'écran | |
+| `08` | rétroéclairage | octet 1 : 0 = cellule photo (couverte : éteint), 1 à 255 = valeur fixe |
+| `09` / `0a` | éteint / allume (test des segments) | |
+
+Complétez les textes avec des espaces : un octet `00` allume des segments parasites.
+
 Le détail et les cas vérifiés se trouvent dans `simcockpit/hw/` et dans les tests, qui
 rejouent des captures réelles (`tests/data/`).
 
@@ -188,7 +229,7 @@ rejouent des captures réelles (`tests/data/`).
 ## Structure du projet
 
 ```
-simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp)
+simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme)
 simcockpit/diag/    bruit, assistants de test des entrées et des sorties
 simcockpit/logic/   configuration, types de commandes, moteur, atmosphère standard
 simcockpit/gui/     fenêtre de test des cartes
