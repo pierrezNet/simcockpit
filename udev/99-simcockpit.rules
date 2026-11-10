@@ -5,3 +5,4 @@
 #   sudo udevadm control --reload && sudo udevadm trigger
 KERNEL=="hidraw*", ATTRS{manufacturer}=="Manuel Velez*", MODE="0660", GROUP="plugdev"
 KERNEL=="hidraw*", ATTRS{manufacturer}=="EFDE*", MODE="0660", GROUP="plugdev"
+KERNEL=="hidraw*", ATTRS{manufacturer}=="Opencockpits*", MODE="0660", GROUP="plugdev"

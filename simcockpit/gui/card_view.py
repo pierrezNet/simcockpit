@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, Q
                                QVBoxLayout,
                                QWidget)
 
-from ..hw import dme, mastercard, mcp
+from ..hw import dme, mastercard, mcp, usbfmc
 from ..hw.device import Card
 
 ACTIVE = "#2e9e44"       # vert : entrée actionnée
@@ -69,7 +69,8 @@ class CardView(QWidget):
 
         root = QVBoxLayout(self)
 
-        self.last = QLabel("Actionnez un bouton du panneau…")
+        self.last = QLabel("Appuyez sur une touche…" if detected.type.protocol == "keys"
+                           else "Actionnez un bouton du panneau…")
         self.last.setAlignment(Qt.AlignCenter)
         self.last.setStyleSheet("font-size:22px; font-weight:bold; padding:8px;")
         root.addWidget(self.last)
@@ -84,7 +85,8 @@ class CardView(QWidget):
         self.cells = []
         # Master/EFDE : 8 groupes de 9 entrées ; MCP (bitmap) : 8 octets de 8 bits
         per_row, row_name = (8, "octet") if detected.type.protocol == "bitmap" else (9, "groupe")
-        n_inputs = min(detected.type.inputs, mastercard.INPUTS)
+        n_inputs = 0 if detected.type.protocol == "keys" else min(detected.type.inputs,
+                                                                   mastercard.INPUTS)
         for row in range(-(-n_inputs // per_row)):
             is_dme = detected.type.protocol == "dme"
             grid.addWidget(QLabel("SEL, PWR" if is_dme else f"{row_name} {row}"), row, 0)
@@ -96,6 +98,8 @@ class CardView(QWidget):
                 self.cells.append(cell)
         if detected.type.protocol == "dme":
             box.setTitle("Boutons : entrée 0 = SEL, entrée 1 = PWR")
+        if detected.type.protocol == "keys":
+            box = self._build_keys()
         top.addWidget(box)
 
         side = QVBoxLayout()
@@ -237,6 +241,8 @@ class CardView(QWidget):
 
         if detected.type.out_protocol == "dme":
             side.addWidget(self._build_dme())
+        if detected.type.out_protocol == "usbfmc":
+            side.addWidget(self._build_fmc_leds())
 
         # --- journal
         side.addWidget(QLabel("Journal"))
@@ -245,6 +251,61 @@ class CardView(QWidget):
 
         self.status = QLabel()
         root.addWidget(self.status)
+
+    def _build_keys(self):
+        """Touches du CDU, groupées comme sur la façade ; une touche appuyée passe au vert."""
+        box = QGroupBox("Touches du CDU — vert = vient d'être appuyée (la carte n'envoie"
+                        " rien au relâchement)")
+        lay = QVBoxLayout(box)
+        self.key_cells, self.key_pressed_at = {}, {}
+        codes = {name: code for code, name in usbfmc.KEYS.items()}
+        for title, names in usbfmc.LAYOUT.items():
+            lay.addWidget(QLabel(f"<b>{title}</b>"))
+            grid = QGridLayout()
+            grid.setSpacing(4)
+            per_row = 6 if title.startswith("Lignes") else 10
+            for k, name in enumerate(names):
+                cell = QLabel(name)
+                cell.setAlignment(Qt.AlignCenter)
+                cell.setMinimumSize(44, 30)
+                cell.setWordWrap(True)
+                cell.setToolTip(f"{name} : touche n° {codes[name]}")
+                grid.addWidget(cell, k // per_row, k % per_row)
+                self.key_cells[codes[name]] = cell
+                self._paint_key(codes[name], False)
+            lay.addLayout(grid)
+        lay.addStretch()
+        return box
+
+    def _paint_key(self, code, pressed):
+        bg = ACTIVE if pressed else REST
+        self.key_cells[code].setStyleSheet(f"background:{bg}; color:white; font-weight:bold;"
+                                           " border-radius:4px; font-size:11px;")
+
+    def _build_fmc_leds(self):
+        box = QGroupBox("Voyants du CDU")
+        lay = QHBoxLayout(box)
+        self.fmc_leds = {}
+        colors = {"EXEC": "#2e9e44", "DSPY": "#c62828", "FAIL": "#c62828"}
+        for name in usbfmc.LEDS:
+            b = QPushButton(name)
+            b.setCheckable(True)
+            b.setStyleSheet(f"QPushButton:checked {{ background:{colors.get(name, '#e0a020')};"
+                            " color:white; font-weight:bold; }")
+            b.toggled.connect(self._send_fmc_leds)
+            lay.addWidget(b)
+            self.fmc_leds[name] = b
+        lay.addStretch()
+        return box
+
+    def _send_fmc_leds(self, *_):
+        lit = [n for n, b in self.fmc_leds.items() if b.isChecked()]
+        try:
+            self._write(usbfmc.led_frame(lit))
+        except OSError as e:
+            self._log(f"ERREUR écriture : {e}")
+            return
+        self._log(f"CDU voyants : {', '.join(lit) or 'aucun'}")
 
     def _build_dme(self):
         """Écran et voyants du DME EFDE."""
@@ -420,6 +481,10 @@ class CardView(QWidget):
             except queue.Empty:
                 break
             self.handle(ev)
+        for code, t in list(getattr(self, "key_pressed_at", {}).items()):   # touche : 0,6 s en vert
+            if now - t > 0.6:
+                del self.key_pressed_at[code]
+                self._paint_key(code, False)
         for i, cell in enumerate(self.cells):  # estompe l'orange après 1 s
             if self.changed_at[i] and now - self.changed_at[i] > 1.0:
                 self.changed_at[i] = 0.0
@@ -437,6 +502,13 @@ class CardView(QWidget):
             else:
                 self._last_raw, self._repeat = hexa, 1
                 self._log(f"{ev.t:8.3f} s   RX {hexa}")
+            return
+        if ev.kind == "key":
+            self.last.setText(f"Touche {ev.value}  (n° {ev.index})")
+            self._log(f"{ev.t:8.2f} s   touche {ev.value} (n° {ev.index})")
+            if ev.index in self.key_cells:
+                self.key_pressed_at[ev.index] = ev.t
+                self._paint_key(ev.index, True)
             return
         if ev.kind == "ready":
             self.state = list(ev.value)

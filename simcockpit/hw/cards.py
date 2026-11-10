@@ -68,12 +68,24 @@ EFDE_DME = CardType(
     verified="boutons SEL et PWR ; écran et voyants (protocole EFDE, validé à la webcam)",
 )
 
+OC_USBFMC = CardType(
+    key="oc_usbfmc",
+    label="OpenCockpits CDU",
+    products=("USBFMC V1.0",),
+    protocol="keys",           # vérifié : une trame par appui, octet 0 = n° de touche
+    active_level=1,
+    inputs=88, outputs=0, axes=0,
+    init=False,                # réveillée par une trame de voyants (hw/usbfmc.py)
+    out_protocol="usbfmc",     # vérifié : octet 0 = masque des 5 voyants
+    verified="touches (7 vérifiées, table de l'ancien script SIOC) ; 5 voyants (webcam)",
+)
+
 UNKNOWN = CardType(
     key="unknown", label="Carte inconnue", products=(), protocol="unknown",
     active_level=1, inputs=0, outputs=0, axes=0, send_init=False,
 )
 
-KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME)
+KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME, OC_USBFMC)
 
 
 def classify(product: str) -> CardType:
@@ -85,7 +97,8 @@ def classify(product: str) -> CardType:
 
 # Fabricants de cartes de cockpit : une carte inconnue de ces fabricants est montrée
 # (en écoute seule) au lieu d'être ignorée comme un clavier ou une souris.
-COCKPIT_MAKERS = {"Manuel Velez": "OpenCockpits", "EFDE": "EFDE"}
+# Les cartes OpenCockpits récentes (USBFMC) s'annoncent « Opencockpits », les autres « Manuel Velez ».
+COCKPIT_MAKERS = {"Manuel Velez": "OpenCockpits", "Opencockpits": "OpenCockpits", "EFDE": "EFDE"}
 
 
 def maker(manufacturer: str):

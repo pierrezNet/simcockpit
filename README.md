@@ -22,6 +22,7 @@ officiel d'OpenCockpits, qui ne fonctionne que sous Windows.
 | EFDE IO32 | `USB32I04AD` | ✅ 32 entrées, 4 axes | ✅ 32 sorties (testée sur une seule) |
 | OpenCockpits MCP (pilote automatique 737) | `IOCard-MCP` | ✅ boutons, interrupteurs, 6 encodeurs | ✅ 6 afficheurs, 15 voyants, point décimal |
 | EFDE DME (réplique Collins IND-42) | `DME USB` | ✅ boutons SEL et PWR | ✅ distance, texte, 9 voyants, rétroéclairage, marche/arrêt |
+| OpenCockpits CDU 737 | `USBFMC V1.0` | ✅ 70 touches | ✅ 5 voyants (OFST, MSG, EXEC, DSPY, FAIL) |
 | OpenCockpits USB Expansion + Master Card | `IOCardUSB` | ✅ 72 entrées (la Master Card doit être alimentée) | ⚠️ codage connu, non testé |
 
 Une carte d'un de ces fabricants dont le modèle est inconnu est quand même détectée.
@@ -62,6 +63,7 @@ Un onglet par carte détectée :
   n'est pas cochée.
 
 Pour le MCP, l'onglet propose aussi un champ par afficheur et un bouton par voyant.
+Pour le CDU, il affiche toutes les touches et un bouton par voyant.
 Pour le DME, il propose la distance, le texte de droite, les voyants, le rétroéclairage
 et la mise en marche ou l'arrêt.
 
@@ -217,6 +219,12 @@ PWR, `0a` au repos. PWR éteint et rallume l'écran de lui-même. En
 
 Complétez les textes avec des espaces : un octet `00` allume des segments parasites.
 
+**CDU OpenCockpits** (`USBFMC V1.0`, fabricant USB « Opencockpits »). La carte reste muette
+tant qu'on ne lui a rien écrit. Ensuite, chaque appui envoie une trame dont l'octet 0 est
+le numéro de la touche (1 à 88) ; rien n'est envoyé au relâchement. En écriture, l'octet 0
+est un masque des voyants : bit 0 OFST, 1 MSG, 2 EXEC, 3 DSPY, 4 FAIL. La table des touches
+est dans `simcockpit/hw/usbfmc.py`.
+
 Le détail et les cas vérifiés se trouvent dans `simcockpit/hw/` et dans les tests, qui
 rejouent des captures réelles (`tests/data/`).
 
@@ -229,7 +237,7 @@ rejouent des captures réelles (`tests/data/`).
 ## Structure du projet
 
 ```
-simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme)
+simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc)
 simcockpit/diag/    bruit, assistants de test des entrées et des sorties
 simcockpit/logic/   configuration, types de commandes, moteur, atmosphère standard
 simcockpit/gui/     fenêtre de test des cartes

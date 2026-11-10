@@ -5,7 +5,7 @@ import threading
 import time
 from dataclasses import dataclass
 
-from . import bitmap, dme, mastercard
+from . import bitmap, dme, mastercard, usbfmc
 from .cards import CardType
 from .debounce import Debouncer
 from .hidraw import HidDevice, HidInfo
@@ -13,7 +13,7 @@ from .hidraw import HidDevice, HidInfo
 
 @dataclass
 class Event:
-    kind: str        # « raw », « input », « axis », « ready », « error »
+    kind: str        # « raw », « input », « axis », « key », « ready », « state », « error »
     t: float
     index: int = None
     value: object = None
@@ -50,6 +50,8 @@ class Card:
         self.dev = HidDevice(self.info.path, writable=not passive)
         if not passive and self.type.init:
             self.dev.write(mastercard.init_packet(ncards=1, naxes=self.type.axes))
+        elif not passive and self.type.protocol == "keys":
+            self.dev.write(usbfmc.led_frame())   # toute écriture réveille la carte ; voyants éteints
         self._thread = threading.Thread(target=self._run, name=self.name, daemon=True)
         self._thread.start()
         return self
@@ -87,6 +89,9 @@ class Card:
                             self.debouncer.update(self.decoder.inputs(), t)
                             if self.state_events:
                                 self._emit("state", value=self.decoder.inputs())
+                    elif self.type.protocol == "keys":
+                        for code in usbfmc.keys_pressed(pkt):
+                            self._emit("key", index=code, value=usbfmc.key_name(code))
                     elif self.type.protocol == "dme":
                         pressed = dme.buttons(pkt)
                         state = pressed + [0] * (mastercard.INPUTS - len(pressed))
@@ -98,6 +103,9 @@ class Card:
                 for i, old, new in self.debouncer.poll(t):
                     if old is not None:
                         self._emit("input", index=i, value=new, old=old)
+                if not ready and self.type.protocol == "keys":   # pas d'état : prête d'emblée
+                    ready = True
+                    self._emit("ready", value=[0] * mastercard.INPUTS)
                 if not ready and self.debouncer.ready():
                     ready = True
                     self._emit("ready", value=list(self.debouncer.stable))
