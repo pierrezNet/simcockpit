@@ -66,6 +66,11 @@ class Engine:
 
     def _apply_output(self, card_id, ctrl, value):
         out = self.outputs.get(card_id)
+        if out is not None and hasattr(ctrl, "led_states"):    # commande qui gère plusieurs voyants
+            for name, on in ctrl.led_states().items():
+                out.set_led(name, on)
+            self._pending[card_id]["leds"] = out.led_frame()
+            return
         if out is None or (ctrl.display is None and ctrl.led is None):
             return
         if ctrl.display is not None:

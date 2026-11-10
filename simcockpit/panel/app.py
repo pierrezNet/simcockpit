@@ -16,6 +16,7 @@ from ..logic import config
 from ..hw import dme as dme_hw
 from ..logic.controls import Encoder, OctalDigits, Selector, SpeedEncoder, Switch
 from ..logic.dme_indicator import DmeIndicator
+from ..logic.rj_autopilot import RjAutopilot
 from ..gui.qtenv import prepare
 from ..logic.engine import Engine
 
@@ -168,6 +169,56 @@ class DmeWidget(QWidget):
             self.screen.show(*dme_cells(c))
 
 
+class AutopilotWidget(QWidget):
+    """Pilote automatique RJ : voyants du MCP, état des modes, boutons virtuels."""
+
+    def __init__(self, ctrl):
+        super().__init__()
+        self.ctrl = ctrl
+        lay = QVBoxLayout(self)
+        title = QLabel(f"<b>{ctrl.name}</b> <span style='color:#888'>— {ctrl.describe()}</span>")
+        title.setWordWrap(True)
+        lay.addWidget(title)
+        self.state = QLabel()
+        self.state.setStyleSheet("font-size:20px; font-weight:bold; padding:4px;")
+        lay.addWidget(self.state)
+        self.alert = QLabel()
+        self.alert.setStyleSheet("background:#f0a020; color:#1c1600; font-weight:bold;"
+                                 " padding:6px 10px; border-radius:4px;")
+        self.alert.hide()
+        lay.addWidget(self.alert)
+        self._alert_timer = QTimer(self, singleShot=True, interval=3000, timeout=self.alert.hide)
+        grid = QGridLayout()
+        self.lamps = {}
+        for k, name in enumerate(ctrl.led_states()):
+            lab = QLabel(name)
+            lab.setAlignment(Qt.AlignCenter)
+            lab.setMinimumHeight(32)             # sinon le texte est rogné par le padding
+            lab.setStyleSheet(POS_OFF)
+            grid.addWidget(lab, k // 8, k % 8)
+            self.lamps[name] = lab
+        lay.addWidget(QLabel("Voyants du MCP"))
+        lay.addLayout(grid)
+        lay.addWidget(QLabel("Boutons virtuels (même effet qu'un appui sur le MCP)"))
+        bgrid = QGridLayout()
+        for k, name in enumerate(ctrl.buttons):
+            b = QPushButton(name)
+            b.clicked.connect(lambda _=False, n=name: ctrl.press(n))
+            bgrid.addWidget(b, k // 8, k % 8)
+        lay.addLayout(bgrid)
+        self.show_value(None)
+
+    def show_value(self, _value):
+        if self.ctrl.alert:                         # alerte : bandeau orange pendant 3 s
+            self.alert.setText("⚠ " + self.ctrl.alert)
+            self.alert.show()
+            self._alert_timer.start()
+            self.ctrl.alert = None
+        self.state.setText(self.ctrl.summary())
+        for name, on in self.ctrl.led_states().items():
+            self.lamps[name].setStyleSheet(POS_ON if on else POS_OFF)
+
+
 class ControlWidget(QWidget):
     """Affichage d'une commande selon son type."""
 
@@ -280,8 +331,12 @@ class PanelWindow(QMainWindow):
             outer.addWidget(QLabel(f"<i>carte « {inst.card} » ({cockpit.cards[inst.card].product})</i>"))
             lay = QGridLayout()
             for k, (name, ctrl) in enumerate(inst.controls.items()):
-                w = DmeWidget(ctrl) if isinstance(ctrl, DmeIndicator) else ControlWidget(ctrl)
-                lay.addWidget(w, k // 3, k % 3)
+                if isinstance(ctrl, RjAutopilot):          # sur toute la largeur, sous les afficheurs
+                    w = AutopilotWidget(ctrl)
+                    lay.addWidget(w, 100, 0, 1, 3)
+                else:
+                    w = DmeWidget(ctrl) if isinstance(ctrl, DmeIndicator) else ControlWidget(ctrl)
+                    lay.addWidget(w, k // 3, k % 3)
                 self.widgets[(inst.id, name)] = w
             outer.addLayout(lay)
             outer.addStretch()
@@ -311,6 +366,9 @@ class PanelWindow(QMainWindow):
             return
         for ch in self.engine.step():
             w = self.widgets.get((ch.instrument, ch.control))
+            alert = getattr(getattr(w, "ctrl", None), "alert", None)
+            if alert:
+                self._log(f"⚠ {ch.instrument}.{ch.control} : {alert}")
             if w:
                 w.show_value(ch.value)
             self._log(f"{ch.instrument}.{ch.control} = {ch.value}")

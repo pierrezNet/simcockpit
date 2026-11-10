@@ -62,6 +62,9 @@ Un onglet par carte détectée :
 - les sorties. Leur écriture est verrouillée tant que la case « Autoriser l'écriture »
   n'est pas cochée.
 
+Avec la case « Suivre la carte actionnée », l'onglet de la carte dont on vient d'actionner
+une commande passe au premier plan.
+
 Pour le MCP, l'onglet propose aussi un champ par afficheur et un bouton par voyant.
 Pour le CDU, il affiche toutes les touches et un bouton par voyant.
 Pour le DME, il propose la distance, le texte de droite, les voyants, le rétroéclairage
@@ -143,6 +146,7 @@ instruments:
 | `encoder` | encodeur rotatif | `inputs`, `min`, `max`, `step`, `wrap`, `invert`, `initial`, `accel` |
 | `speed_encoder` | vitesse avec bascule IAS / Mach (bouton C/O) | `toggle_input`, `toggle_level`, `ias`, `mach`, `altitude_from` |
 | `dme_indicator` | indicateur DME Collins IND-42C sur le DME EFDE | `channel`, `self_test`, `backlight` |
+| `rj_autopilot` | modes du pilote automatique de l'Avro RJ sur le MCP (voyants compris) | `buttons`, `fd_left`, `fd_right`, `at_arm`, `disengage` |
 
 Options communes à tous les types : `display` (afficheur), `led` (voyant), `leading_zeros`.
 
@@ -162,6 +166,14 @@ Options communes à tous les types : `display` (afficheur), `led` (voyant), `lea
   1, 2 ou 3) est fixe, comme sur l'IND-42C. Le HLD de l'avion (appui long sur SEL) n'est
   pas repris : le bouton du DME EFDE ne transmet pas la durée d'appui. En attendant
   X-Plane, le panneau virtuel simule la distance, la vitesse sol et l'identifiant.
+
+- **`rj_autopilot` :** en attendant X-Plane, la logique est simulée. Les modes latéraux (HDG,
+  NAV, LNAV) sont exclusifs entre eux, de même que les modes verticaux (ALT, VS, LVL CHG,
+  VNAV). APP engage les deux axes. Un nouvel appui sur un mode engagé le désengage.
+  CMD A et CMD B choisissent NAV1 ou NAV2 ; N1 et SPEED basculent THRUST. Les voyants
+  CWS A et CWS B suivent les F/D gauche et droit, et A/T ARM suit son interrupteur. La
+  barre DISENGAGE baissée coupe tout. Un appui sans effet (CWS avec F/D sur OFF, bouton
+  avec la barre baissée) affiche une alerte dans le panneau.
 
 ## Protocoles
 

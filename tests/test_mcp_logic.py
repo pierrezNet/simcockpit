@@ -108,7 +108,10 @@ class TestEngineReplay(unittest.TestCase):
         self.assertEqual(final["vitesse_verticale"], -500)
         # CRS2 : 5 crans, dont deux à 0,12 s d'écart → accélération ×3 sur l'un d'eux
         self.assertEqual(final["crs2"], 8)
-        self.assertEqual(last["at_arm"], [False, True, False])
+        # A/T ARM basculé puis rebasculé : géré par le pilote automatique RJ
+        ap = last["pilote_auto"]
+        self.assertTrue(any(v.endswith("AT") for v in ap))
+        self.assertFalse(ap[-1].endswith("AT"))
         # C/O ×2 : 255 kt → Mach .47 à 10500 ft (ISA), puis retour exact à 255 kt
         self.assertEqual(last["vitesse"], [250, 251, 252, 253, 254, 255, 47, 255])
         out = eng.outputs["mcp"]

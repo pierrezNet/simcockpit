@@ -3,7 +3,7 @@
 import queue
 import time
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QListWidget, QProgressBar, QPushButton, QSpinBox,
                                QVBoxLayout,
@@ -49,6 +49,9 @@ class OutputCell(QPushButton):
 
 
 class CardView(QWidget):
+    # une commande de la carte vient d'être actionnée (entrée ou touche ; pas les axes)
+    activity = Signal()
+
     def __init__(self, detected, parent=None):
         super().__init__(parent)
         self.detected = detected
@@ -504,6 +507,7 @@ class CardView(QWidget):
                 self._log(f"{ev.t:8.3f} s   RX {hexa}")
             return
         if ev.kind == "key":
+            self.activity.emit()
             self.last.setText(f"Touche {ev.value}  (n° {ev.index})")
             self._log(f"{ev.t:8.2f} s   touche {ev.value} (n° {ev.index})")
             if ev.index in self.key_cells:
@@ -518,6 +522,7 @@ class CardView(QWidget):
             self.status.setText(f"{self.card.name} — {self.detected.info.path} — prête."
                                 f" Actionnées au repos : {act or 'aucune'}")
         elif ev.kind == "input":
+            self.activity.emit()
             self.state[ev.index] = ev.value
             self.changed_at[ev.index] = ev.t
             active = self.card.is_active(ev.value)

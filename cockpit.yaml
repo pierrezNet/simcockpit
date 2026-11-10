@@ -79,10 +79,27 @@ instruments:
         wrap: true
         display: CRS2
         leading_zeros: true     # affiche 000, 045…
-      at_arm:
-        type: switch
-        input: 30
-        led: A/T ARM
+      pilote_auto:
+        type: rj_autopilot      # logique RJ simulée (voir simcockpit/logic/rj_autopilot.py)
+        buttons:                # poussoirs du MCP (1 au repos, 0 appuyé)
+          N1: 29                # THRUST
+          SPEED: 28             # THRUST aussi
+          VNAV: 27
+          LVL CHG: 26
+          HDG SEL: 25           # HDG
+          LNAV: 24
+          VOR LOC: 23           # NAV
+          APP: 22
+          ALT HLD: 21           # ALT
+          V/S: 20               # VS
+          CMD A: 19             # NAV1
+          CMD B: 18             # NAV2
+          CWS A: 17             # sans effet (voyant = F/D gauche)
+          CWS B: 16             # sans effet (voyant = F/D droit)
+        fd_left: 15             # interrupteur F/D gauche (1 = ON)
+        fd_right: 13            # interrupteur F/D droit
+        at_arm: 30              # A/T ARM (1 = armé)
+        disengage: 14           # barre DISENGAGE (0 = baissée)
 
   dme:
     label: DME (Collins IND-42C)

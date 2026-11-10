@@ -2,8 +2,8 @@
 
 import sys
 
-from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QMainWindow, QPushButton,
-                               QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QHBoxLayout, QLabel, QMainWindow,
+                               QPushButton, QTabWidget, QVBoxLayout, QWidget)
 
 from ..hw import manager
 from .card_view import CardView
@@ -23,7 +23,12 @@ class MainWindow(QMainWindow):
         self.found = QLabel()
         refresh = QPushButton("Rechercher les cartes")
         refresh.clicked.connect(self.rescan)
+        self.follow = QCheckBox("Suivre la carte actionnée")
+        self.follow.setToolTip("Affiche l'onglet de la carte dont on vient d'actionner une"
+                               " commande. Décochez si une carte a des entrées instables.")
+        self.follow.setChecked(True)
         bar.addWidget(self.found, 1)
+        bar.addWidget(self.follow)
         bar.addWidget(refresh)
         lay.addLayout(bar)
         self.tabs = QTabWidget()
@@ -47,7 +52,12 @@ class MainWindow(QMainWindow):
             view = CardView(d)
             self.tabs.addTab(view, f"{d.label.split(' (')[0]} [{d.info.usb_port}]")
             self.views[d.info.usb_port] = view
+            view.activity.connect(lambda v=view: self._follow(v))
             view.start()
+
+    def _follow(self, view):
+        if self.follow.isChecked() and self.tabs.currentWidget() is not view:
+            self.tabs.setCurrentWidget(view)
 
     def closeEvent(self, event):
         for view in self.views.values():
