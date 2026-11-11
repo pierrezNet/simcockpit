@@ -28,6 +28,7 @@ class Instrument:
 class Cockpit:
     cards: dict
     instruments: dict
+    sim: dict = None          # ex. {"type": "xplane", "host": "127.0.0.1", "port": 49000}
 
 
 class ConfigError(ValueError):
@@ -81,4 +82,10 @@ def parse(data):
                                       " de cet instrument")
                 ctrl.altitude_control = ctrls[src]
         instruments[iid] = Instrument(iid, spec.get("label", iid), card, ctrls)
-    return Cockpit(cards, instruments)
+    sim = data.get("sim")
+    if sim is not None:
+        if not isinstance(sim, dict) or sim.get("type", "xplane") != "xplane":
+            raise ConfigError("sim : seul « type: xplane » est pris en charge")
+        sim = {"type": "xplane", "host": sim.get("host", "127.0.0.1"),
+               "port": int(sim.get("port", 49000))}
+    return Cockpit(cards, instruments, sim)

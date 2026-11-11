@@ -1,0 +1,136 @@
+# MCP OpenCockpits relié au Boeing 737-800 de Laminar (X-Plane 12).
+# Lancement : ./cockpit-panel b738.yaml   (X-Plane lancé, avion « Boeing 737-800 » chargé)
+# Noms vérifiés dans X-Plane 12/Resources/plugins/DataRefs.txt, Commands.txt et dans le
+# script de l'avion (plugins/xlua/scripts/B738.glareshield/B738.glareshield.lua).
+
+sim:
+  type: xplane
+  host: 127.0.0.1
+  port: 49000
+
+cards:
+  mcp:
+    product: IOCard-MCP
+
+instruments:
+  mcp:
+    label: MCP 737 (X-Plane)
+    card: mcp
+    controls:
+      crs1:
+        type: encoder
+        inputs: [4, 5]
+        min: 0
+        max: 359
+        wrap: true
+        display: CRS1
+        leading_zeros: true
+        dataref: sim/cockpit2/radios/actuators/nav1_obs_deg_mag_pilot
+      vitesse:
+        type: speed_encoder
+        inputs: [0, 1]
+        toggle_input: 12              # C/O
+        toggle_level: 0
+        ias: [100, 340, 1]
+        mach: [40, 89, 1]
+        display: IAS
+        dataref: sim/cockpit2/autopilot/airspeed_dial_kts_mach
+        mach_dataref: sim/cockpit2/autopilot/airspeed_is_mach
+        toggle_command: laminar/B738/autopilot/change_over_press
+      cap:
+        type: encoder
+        inputs: [6, 7]
+        min: 0
+        max: 359
+        wrap: true
+        display: HDG
+        leading_zeros: true
+        dataref: sim/cockpit2/autopilot/heading_dial_deg_mag_pilot
+      altitude:
+        type: encoder
+        inputs: [2, 3]
+        min: 0
+        max: 41000
+        step: 100
+        display: ALT
+        dataref: sim/cockpit2/autopilot/altitude_dial_ft
+      vitesse_verticale:
+        type: encoder
+        inputs: [10, 11]
+        min: -7900
+        max: 6000
+        step: 100
+        invert: true
+        accel: [[0.06, 5], [0.15, 2]]
+        display: VS
+        dataref: sim/cockpit2/autopilot/vvi_dial_fpm
+      crs2:
+        type: encoder
+        inputs: [8, 9]
+        min: 0
+        max: 359
+        wrap: true
+        display: CRS2
+        leading_zeros: true
+        dataref: sim/cockpit2/radios/actuators/nav2_obs_deg_mag_copilot
+
+      boutons:
+        type: commands
+        level: 0                      # poussoirs du MCP : 0 pendant l'appui
+        inputs:
+          29: laminar/B738/autopilot/n1_press
+          28: laminar/B738/autopilot/speed_press
+          27: laminar/B738/autopilot/vnav_press
+          26: laminar/B738/autopilot/lvl_chg_press
+          25: laminar/B738/autopilot/hdg_sel_press
+          24: laminar/B738/autopilot/lnav_press
+          23: laminar/B738/autopilot/vorloc_press
+          22: laminar/B738/autopilot/app_press
+          21: laminar/B738/autopilot/alt_hld_press
+          20: laminar/B738/autopilot/vs_press
+          19: laminar/B738/autopilot/cmd_a_press
+          18: laminar/B738/autopilot/cmd_b_press
+          17: laminar/B738/autopilot/cws_a_press
+          16: laminar/B738/autopilot/cws_b_press
+
+      voyants:
+        type: sim_leds
+        leds:
+          N1: laminar/B738/autopilot/n1_status
+          SPEED: laminar/B738/autopilot/speed_status1
+          VNAV: laminar/B738/autopilot/vnav_status1
+          LVL CHG: laminar/B738/autopilot/lvl_chg_status
+          HDG SEL: laminar/B738/autopilot/hdg_sel_status
+          LNAV: laminar/B738/autopilot/lnav_status
+          VOR LOC: laminar/B738/autopilot/vorloc_status
+          APP: laminar/B738/autopilot/app_status
+          ALT HLD: laminar/B738/autopilot/alt_hld_status
+          V/S: laminar/B738/autopilot/vs_status
+          CMD A: laminar/B738/autopilot/cmd_a_status
+          CMD B: laminar/B738/autopilot/cmd_b_status
+          CWS A: laminar/B738/autopilot/cws_a_status
+          CWS B: laminar/B738/autopilot/cws_b_status
+          A/T ARM: laminar/B738/autopilot/autothrottle_status
+
+      fd_gauche:
+        type: switch
+        input: 15
+        command_on: sim/autopilot/fdir_command_bars_on
+        command_off: sim/autopilot/fdir_command_bars_off
+      fd_droit:
+        type: switch
+        input: 13
+        command_on: sim/autopilot/fdir2_command_bars_on
+        command_off: sim/autopilot/fdir2_command_bars_off
+      at_arm:
+        type: switch
+        input: 30
+        command_on: sim/autopilot/autothrottle_arm
+        command_off: sim/autopilot/autothrottle_hard_off
+      disengage:
+        type: switch
+        input: 14
+        invert: true                  # « on » = barre baissée (entrée à 0)
+        toggle_command: laminar/B738/autopilot/disconnect_toggle
+        state_dataref: laminar/B738/autopilot/disconnect_pos
+        state_on: 1

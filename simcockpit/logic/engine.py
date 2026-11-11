@@ -38,6 +38,14 @@ class Engine:
                         if classify(spec.product).out_protocol == "mcp"}
         self._pending = {cid: {} for cid in cockpit.cards}  # clé de trame -> trame, dans l'ordre
         self._last_write = {}
+        # simulateur : connecteur créé à la demande (connect_sim), abonnements par commande
+        self.sim = None
+        self.sim_connected = False
+        self._sim_listeners = {}          # dataref -> [commandes]
+        for inst in cockpit.instruments.values():
+            for ctrl in inst.controls.values():
+                for ref in ctrl.sim_datarefs():
+                    self._sim_listeners.setdefault(ref, []).append(ctrl)
 
     # ------------------------------------------------------------ cœur, sans matériel
     def feed(self, card_id, raw_inputs, t, active_level):
@@ -106,9 +114,40 @@ class Engine:
             p0, p1 = out.display_frames()
             self._pending[card_id].update({"page0": p0, "page1": p1, "leds": out.led_frame()})
 
+    def _controls(self):
+        for inst in self.cockpit.instruments.values():
+            yield from inst.controls.values()
+
+    def sim_step(self, changed, connected, now):
+        """Cœur de la liaison simulateur (testable sans réseau) : nouvelles valeurs, état
+        de la connexion. Retourne les actions à transmettre."""
+        if connected != self.sim_connected:
+            self.sim_connected = connected
+            for ctrl in self._controls():
+                ctrl.sim_connected = connected
+            if connected:
+                for ctrl in self._controls():
+                    ctrl.sim_sync()               # pousse la position des interrupteurs
+        for ref, value in changed.items():
+            for ctrl in self._sim_listeners.get(ref, ()):
+                ctrl.on_sim(ref, value, now)
+        actions = []
+        for ctrl in self._controls():
+            actions += ctrl.take_sim_actions()
+        return actions
+
+    def connect_sim(self):
+        """Ouvre la liaison X-Plane si la configuration en déclare une."""
+        if self.cockpit.sim and self.sim is None:
+            from ..sim.xplane import XPlane
+            self.sim = XPlane(self.cockpit.sim["host"], self.cockpit.sim["port"])
+            for ref in self._sim_listeners:
+                self.sim.subscribe(ref)
+
     # ------------------------------------------------------------ matériel
     def connect(self):
-        """Ouvre les cartes déclarées. Retourne {id: statut}."""
+        """Ouvre les cartes déclarées (et la liaison X-Plane). Retourne {id: statut}."""
+        self.connect_sim()
         present = manager.scan()
         taken = set()
         for cid, spec in self.cockpit.cards.items():
@@ -149,7 +188,13 @@ class Engine:
                     card.stop()
                     del self.cards[cid]
         now = time.monotonic()
+        if self.sim is not None:
+            for action in self.sim_step(self.sim.poll(), self.sim.connected, now):
+                (self.sim.command if action[0] == "cmd" else self.sim.write)(*action[1:])
         changes = self.poll(now)
+        if self.sim is not None:                  # actions nées du poll (interrupteurs…)
+            for action in self.sim_step({}, self.sim.connected, now):
+                (self.sim.command if action[0] == "cmd" else self.sim.write)(*action[1:])
         for cid, card in self.cards.items():
             frame = self.take_frame(cid, now)
             if frame is not None:
@@ -163,3 +208,6 @@ class Engine:
         for card in self.cards.values():
             card.stop()
         self.cards.clear()
+        if self.sim is not None:
+            self.sim.close()
+            self.sim = None

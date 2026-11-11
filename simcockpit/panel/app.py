@@ -356,15 +356,29 @@ class PanelWindow(QMainWindow):
         for cid, st in status.items():
             if st != before.get(cid):
                 self._log(f"carte {cid} : {st}")
-        self.cards_label.setText(" &nbsp; ".join(
-            f"<b>{cid}</b> ({self.engine.cockpit.cards[cid].product}) : "
-            f"<span style='color:{'#4c4' if st.startswith('connectée') else '#e55'}'>{st}</span>"
-            for cid, st in status.items()))
+        self._show_status(status)
+
+    def _show_status(self, status=None):
+        status = status or self.engine.status
+        parts = [f"<b>{cid}</b> ({self.engine.cockpit.cards[cid].product}) : "
+                 f"<span style='color:{'#4c4' if st.startswith('connectée') else '#e55'}'>{st}</span>"
+                 for cid, st in status.items()]
+        if self.engine.cockpit.sim:
+            ok = self.engine.sim_connected
+            parts.append("<b>X-Plane</b> : " + (
+                "<span style='color:#4c4'>connecté</span>" if ok else
+                "<span style='color:#e55'>en attente (lancez X-Plane)</span>"))
+        self.cards_label.setText(" &nbsp; ".join(parts))
 
     def _step(self):
         if not self.engine:
             return
-        for ch in self.engine.step():
+        was = self.engine.sim_connected
+        changes = self.engine.step()
+        if self.engine.sim_connected != was:
+            self._log("X-Plane " + ("connecté" if self.engine.sim_connected else "perdu"))
+            self._show_status()
+        for ch in changes:
             w = self.widgets.get((ch.instrument, ch.control))
             alert = getattr(getattr(w, "ctrl", None), "alert", None)
             if alert:

@@ -9,7 +9,8 @@ officiel d'OpenCockpits, qui ne fonctionne que sous Windows.
   tester les sorties (voyants, afficheurs 7 segments) ;
 - décrit la logique du cockpit dans un simple fichier YAML (transpondeur, pilote
   automatique…) et l'exécute ;
-- connexion à **X-Plane 12** : prévue, pas encore écrite.
+- se relie à **X-Plane 12** par son protocole UDP natif, sans plugin (MCP relié au
+  Boeing 737-800 de Laminar).
 
 > **État : preuve de concept.** Les protocoles ont été retrouvés par rétro-ingénierie
 > sur du matériel réel (voir [Protocoles](#protocoles)). Ce projet n'est affilié ni à
@@ -108,6 +109,16 @@ python3 -m simcockpit listen --port 1-14  # trames brutes, sans rien envoyer
 python3 -m simcockpit send --port 1-14 "…" # envoyer une trame brute (essais)
 ```
 
+### Avec X-Plane 12
+
+```sh
+./cockpit-panel b738.yaml     # MCP relié au Boeing 737-800 de Laminar
+```
+
+Lancez X-Plane (le port UDP 49000 est ouvert par défaut) et chargez l'avion. Le panneau
+affiche « X-Plane : connecté » dès que le simulateur répond, et se reconnecte seul s'il
+redémarre. À la connexion, la position des interrupteurs du MCP est envoyée à l'avion.
+
 ## Configuration : `cockpit.yaml`
 
 Une carte est désignée par son nom USB. Ajoutez son port USB (`usb_port`, affiché par
@@ -146,9 +157,22 @@ instruments:
 | `encoder` | encodeur rotatif | `inputs`, `min`, `max`, `step`, `wrap`, `invert`, `initial`, `accel` |
 | `speed_encoder` | vitesse avec bascule IAS / Mach (bouton C/O) | `toggle_input`, `toggle_level`, `ias`, `mach`, `altitude_from` |
 | `dme_indicator` | indicateur DME Collins IND-42C sur le DME EFDE | `channel`, `self_test`, `backlight` |
+| `commands` | poussoirs → commandes X-Plane (`inputs: {entrée: commande}`) | `inputs`, `level` |
+| `sim_leds` | voyants du MCP qui suivent des datarefs X-Plane | `leds` |
 | `rj_autopilot` | modes du pilote automatique de l'Avro RJ sur le MCP (voyants compris) | `buttons`, `fd_left`, `fd_right`, `at_arm`, `disengage` |
 
 Options communes à tous les types : `display` (afficheur), `led` (voyant), `leading_zeros`.
+
+Liaison X-Plane (section `sim: {type: xplane, host, port}` en tête du fichier) :
+- `encoder` et `speed_encoder` : `dataref` (valeur écrite quand on tourne, et affichée
+  quand elle change dans le simulateur) ; pour la vitesse, `mach_dataref` et
+  `toggle_command` (bouton C/O) ;
+- `switch` : `command_on` / `command_off`, ou `toggle_command` avec `state_dataref` et
+  `state_on` pour un interrupteur que le simulateur ne connaît qu'en bascule ; `invert`.
+
+Les noms de datarefs et de commandes se trouvent dans `X-Plane 12/Resources/plugins/`
+(`DataRefs.txt`, `Commands.txt`) et, pour un avion qui définit les siens, dans ses
+scripts (voir `b738.yaml`).
 
 À noter :
 - Les valeurs codées sur plusieurs entrées (transpondeur, sélecteurs) sont filtrées en
@@ -254,6 +278,7 @@ simcockpit/diag/    bruit, assistants de test des entrées et des sorties
 simcockpit/logic/   configuration, types de commandes, moteur, atmosphère standard
 simcockpit/gui/     fenêtre de test des cartes
 simcockpit/panel/   panneau virtuel (logique du cockpit)
+simcockpit/sim/     liaison X-Plane (UDP)
 tests/              tests unitaires et captures réelles
 udev/               règle d'accès aux cartes
 iocard_test.py      script d'exploration d'origine (référence)

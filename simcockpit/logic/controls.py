@@ -21,6 +21,28 @@ class Control:
         self.display = display    # afficheur de sortie (ex. « HDG » sur le MCP)
         self.led = led            # voyant de sortie (ex. « A/T ARM »)
 
+    # --- simulateur (X-Plane) : rien par défaut ; les sous-classes surchargent
+    sim_connected = False
+
+    def sim_datarefs(self):
+        """Datarefs à suivre."""
+        return []
+
+    def on_sim(self, name, value, t):
+        """Nouvelle valeur d'un dataref suivi."""
+
+    def sim_sync(self):
+        """X-Plane vient d'apparaître : renvoyer l'état du matériel (interrupteurs…)."""
+
+    def _sim(self, *action):
+        self.__dict__.setdefault("_sim_actions", []).append(action)
+
+    def take_sim_actions(self):
+        """Actions à transmettre : ("cmd", nom) ou ("dref", nom, valeur)."""
+        out = self.__dict__.get("_sim_actions", [])
+        self._sim_actions = []
+        return out
+
     def update(self, active, t):
         """`active` : liste complète des entrées (1 = actionnée). Retourne la nouvelle valeur ou None."""
         self._deb.update(active, t)
@@ -81,14 +103,58 @@ class Selector(Control):
 
 
 class Switch(Control):
-    """Interrupteur ou poussoir sur une entrée : True quand actionné."""
+    """Interrupteur ou poussoir sur une entrée : True quand actionné.
+
+    Avec X-Plane : `command_on` / `command_off` sont envoyées à chaque changement de
+    position (et à la connexion) ; ou bien `toggle_command` est envoyée tant que
+    `state_dataref` (valeur `state_on` = position « on ») ne suit pas l'interrupteur.
+    `invert` : la position « on » est l'entrée au repos (ex. barre DISENGAGE baissée = 0).
+    """
     type = "switch"
 
-    def __init__(self, name, input, **kw):
+    def __init__(self, name, input, invert=False, command_on=None, command_off=None,
+                 toggle_command=None, state_dataref=None, state_on=1, **kw):
         super().__init__(name, [input], **kw)
+        self.invert = invert
+        self.command_on, self.command_off = command_on, command_off
+        self.toggle_command, self.state_dataref, self.state_on = toggle_command, state_dataref, state_on
+        self._sim_state = None
+        self._last_toggle = -1e9
 
     def decode(self, bits):
-        return bool(bits[self.indexes[0]])
+        return bool(bits[self.indexes[0]]) != self.invert
+
+    def poll(self, t):
+        v = super().poll(t)
+        if v is not None:
+            self._push(t)
+        return v
+
+    def _push(self, t=None):
+        if self.value is None or not self.sim_connected:
+            return
+        cmd = self.command_on if self.value else self.command_off
+        if cmd:
+            self._sim("cmd", cmd)
+        self._check_toggle(t)
+
+    def _check_toggle(self, t):
+        if not (self.toggle_command and self.state_dataref) or self._sim_state is None:
+            return
+        sim_on = round(self._sim_state) == self.state_on
+        if sim_on != bool(self.value) and (t is None or t - self._last_toggle > 0.5):
+            self._last_toggle = t if t is not None else 0
+            self._sim("cmd", self.toggle_command)
+
+    def sim_datarefs(self):
+        return [self.state_dataref] if self.state_dataref else []
+
+    def on_sim(self, name, value, t):
+        self._sim_state = value
+        self._check_toggle(t)
+
+    def sim_sync(self):
+        self._push()
 
 
 # Ordre du code Gray d'un encodeur (a = 1re entrée, b = 2e) : 00 → 01 → 11 → 10.
@@ -107,11 +173,15 @@ class Encoder(Control):
     """
     type = "encoder"
 
+    LOCAL_HOLD = 0.4    # s : après un cran, la valeur locale prime sur celle d'X-Plane
+
     def __init__(self, name, inputs, min=0, max=359, step=1, initial=None, wrap=False,
-                 invert=False, accel=True, **kw):
+                 invert=False, accel=True, dataref=None, **kw):
         if len(inputs) != 2:
             raise ValueError(f"{name} : un encodeur a 2 entrées, reçu {inputs}")
         super().__init__(name, inputs, **kw)
+        self.dataref = dataref          # valeur suivie et écrite dans X-Plane
+        self._local_until = -1e9
         self.min, self.max, self.step = min, max, step
         self.wrap, self.sign = wrap, (-1 if invert else 1)
         self.accel = sorted(DEFAULT_ACCEL if accel is True else (accel or ()))
@@ -144,6 +214,26 @@ class Encoder(Control):
         new = self._clamp(self.value + self.sign * clicks * self.step * mult)
         if new != self.value:
             self.value, self._changed = new, True
+            if self.dataref and self.sim_connected:
+                self._sim("dref", self.dataref, self.to_sim(new))
+                self._local_until = t + self.LOCAL_HOLD
+
+    def to_sim(self, value):
+        return value
+
+    def from_sim(self, value):
+        return self._clamp(round(value))
+
+    def sim_datarefs(self):
+        return [self.dataref] if self.dataref else []
+
+    def on_sim(self, name, value, t):
+        self.__dict__.setdefault("_last_sim", {})[name] = value
+        if name != self.dataref or t < self._local_until:
+            return                      # on vient de tourner : X-Plane n'a pas encore suivi
+        v = self.from_sim(value)
+        if v != self.value:
+            self.value, self._changed = v, True
 
     def update(self, active, t):
         state = _GRAY[(active[self.indexes[0]], active[self.indexes[1]])]
@@ -178,7 +268,7 @@ class SpeedEncoder(Encoder):
 
     def __init__(self, name, inputs, toggle_input, toggle_level=1, ias=(100, 340, 1),
                  mach=(40, 89, 1), initial_ias=250, initial_mach=78, altitude_from=None,
-                 **kw):
+                 mach_dataref=None, toggle_command=None, **kw):
         super().__init__(name, inputs, min=ias[0], max=ias[1], step=ias[2], initial=initial_ias,
                          **kw)
         self.indexes.append(toggle_input)
@@ -191,6 +281,8 @@ class SpeedEncoder(Encoder):
         self._toggle_level = toggle_level     # valeur « actionnée » du bouton C/O (MCP : 0)
         self._was_pressed = None
         self._last_toggle_t = -1e9
+        self.mach_dataref = mach_dataref       # X-Plane : 1 = Mach
+        self.toggle_command = toggle_command   # X-Plane : commande C/O
 
     def update(self, active, t):
         super().update(active, t)
@@ -201,7 +293,10 @@ class SpeedEncoder(Encoder):
         # appui pris au premier front ; rebonds ignorés pendant 0,3 s
         if pressed and not self._was_pressed and t - self._last_toggle_t >= 0.3:
             self._last_toggle_t = t
-            self._switch_mode()
+            if self.sim_connected and self.toggle_command:
+                self._sim("cmd", self.toggle_command)     # X-Plane convertit lui-même
+            else:
+                self._switch_mode()
         self._was_pressed = pressed
 
     def _switch_mode(self):
@@ -225,6 +320,34 @@ class SpeedEncoder(Encoder):
         self.min, self.max, self.step = self._ranges[new_mode]
         self.value, self._changed = self._values[new_mode], True
 
+    def to_sim(self, value):
+        return value / 100 if self.mode == "MACH" else value
+
+    def from_sim(self, value):
+        return self._clamp(round(value * 100) if self.mode == "MACH" else round(value))
+
+    def sim_datarefs(self):
+        return super().sim_datarefs() + ([self.mach_dataref] if self.mach_dataref else [])
+
+    def on_sim(self, name, value, t):
+        self.__dict__.setdefault("_last_sim", {})[name] = value
+        if name == self.mach_dataref:
+            mode = "MACH" if value >= 0.5 else "IAS"
+            if mode != self.mode:
+                self._values[self.mode] = self.value
+                self.mode = mode
+                self.min, self.max, self.step = self._ranges[mode]
+                self._local_until = -1e9          # la valeur d'X-Plane fait foi
+                dial = self.dataref and self._sim_value(self.dataref)
+                if dial is not None:
+                    self.value = self.from_sim(dial)
+                self._changed = True
+            return
+        super().on_sim(name, value, t)
+
+    def _sim_value(self, name):
+        return getattr(self, "_last_sim", {}).get(name)
+
     def display_value(self, value):
         if self.mode == "MACH":                       # « .78 » : chiffre de gauche éteint + point
             return f"{value:02d}" if value < 100 else str(value), True
@@ -241,7 +364,8 @@ TYPES = {c.type: c for c in (OctalDigits, Selector, Switch, Encoder, SpeedEncode
 def make(name, spec):
     from .dme_indicator import DmeIndicator   # ici : ces modules importent Control
     from .rj_autopilot import RjAutopilot
-    for cls in (DmeIndicator, RjAutopilot):
+    from .sim_controls import Commands, SimLeds
+    for cls in (DmeIndicator, RjAutopilot, Commands, SimLeds):
         TYPES.setdefault(cls.type, cls)
     spec = dict(spec)
     kind = spec.pop("type", None)
