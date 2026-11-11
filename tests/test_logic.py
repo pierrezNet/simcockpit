@@ -47,8 +47,8 @@ class TestControls(unittest.TestCase):
 
 class TestConfig(unittest.TestCase):
     def test_project_file_loads(self):
-        ck = config.load(os.path.join(ROOT, "cockpit.yaml"))
-        self.assertEqual(list(ck.instruments), ["transpondeur", "mcp", "dme"])
+        ck = config.load(os.path.join(ROOT, "config/avions/rj85-simule"))
+        self.assertEqual(sorted(ck.instruments), ["dme", "mcp", "transpondeur"])
         self.assertEqual(ck.cards["io32"].product, "USB32I04AD")
 
     def test_errors(self):
@@ -66,7 +66,7 @@ class TestConfig(unittest.TestCase):
 
 class TestEngineReplay(unittest.TestCase):
     def test_capture_through_cockpit_yaml(self):
-        eng = Engine(config.load(os.path.join(ROOT, "cockpit.yaml")))
+        eng = Engine(config.load(os.path.join(ROOT, "config/avions/rj85-simule")))
         dec, seen = Decoder(), []
         for t, pkt in frames("efde_xpdr_4444_to_2000.txt"):
             if dec.feed(pkt).inputs_changed:
@@ -82,3 +82,13 @@ class TestEngineReplay(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestConfigErrors(unittest.TestCase):
+    def test_tab_is_reported_with_line(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write("cards:\n  mcp:\n\tproduct: IOCard-MCP\n")
+        with self.assertRaisesRegex(config.ConfigError, "ligne 3 : tabulation"):
+            config.load(f.name)
+        os.unlink(f.name)

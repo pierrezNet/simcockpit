@@ -14,7 +14,7 @@ def _pick(args):
     d = manager.find(args.port)
     if d is None:
         where = f" sur le port {args.port}" if args.port else ""
-        sys.exit(f"Aucune carte connue{where}. Voir : python -m simcockpit list --all")
+        sys.exit(f"Aucune carte connue{where}. Voir : bin/simcockpit list --all")
     print(f"Carte : {d.label}  ({d.info.product}, port {d.info.usb_port}, {d.info.path})")
     return d
 

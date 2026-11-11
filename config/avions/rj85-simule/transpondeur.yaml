@@ -1,0 +1,16 @@
+# Avro RJ85, logique simulée : transpondeur sur la carte EFDE IO32.
+
+instruments:
+  transpondeur:
+    label: Transpondeur
+    card: io32
+    controls:
+      code:
+        type: octal_digits    # 4 molettes, chacune codée en binaire sur 3 entrées (bit 0 en premier)
+        inputs: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]
+      mode:
+        type: selector        # la 1re position active de la liste l'emporte
+        positions:            # (en ON, le contact STBY reste aussi fermé)
+          "ON": 12
+          STBY: 13
+        default: "OFF"        # aucune position active

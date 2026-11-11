@@ -1,16 +1,6 @@
 # MCP OpenCockpits relié au Boeing 737-800 de Laminar (X-Plane 12).
-# Lancement : ./cockpit-panel b738.yaml   (X-Plane lancé, avion « Boeing 737-800 » chargé)
 # Noms vérifiés dans X-Plane 12/Resources/plugins/DataRefs.txt, Commands.txt et dans le
 # script de l'avion (plugins/xlua/scripts/B738.glareshield/B738.glareshield.lua).
-
-sim:
-  type: xplane
-  host: 127.0.0.1
-  port: 49000
-
-cards:
-  mcp:
-    product: IOCard-MCP
 
 instruments:
   mcp:
@@ -34,6 +24,7 @@ instruments:
         ias: [100, 340, 1]
         mach: [40, 89, 1]
         display: IAS
+        blank_unless: laminar/b738/autopilot/airspeed_window_open
         dataref: sim/cockpit2/autopilot/airspeed_dial_kts_mach
         mach_dataref: sim/cockpit2/autopilot/airspeed_is_mach
         toggle_command: laminar/B738/autopilot/change_over_press
@@ -53,6 +44,7 @@ instruments:
         max: 41000
         step: 100
         display: ALT
+        min_digits: 3
         dataref: sim/cockpit2/autopilot/altitude_dial_ft
       vitesse_verticale:
         type: encoder
@@ -63,6 +55,7 @@ instruments:
         invert: true
         accel: [[0.06, 5], [0.15, 2]]
         display: VS
+        blank_when: 0
         dataref: sim/cockpit2/autopilot/vvi_dial_fpm
       crs2:
         type: encoder
@@ -110,7 +103,7 @@ instruments:
           CMD B: laminar/B738/autopilot/cmd_b_status
           CWS A: laminar/B738/autopilot/cws_a_status
           CWS B: laminar/B738/autopilot/cws_b_status
-          A/T ARM: laminar/B738/autopilot/autothrottle_status
+          A/T ARM: sim/cockpit2/autopilot/autothrottle_arm
 
       fd_gauche:
         type: switch

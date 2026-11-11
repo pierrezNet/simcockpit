@@ -1,0 +1,14 @@
+# Cartes physiques du cockpit, décrites une seule fois pour tous les avions.
+# Une carte est désignée par son nom USB. Ajoutez `usb_port` (affiché par
+# `python3 -m simcockpit list`) si plusieurs cartes identiques sont branchées.
+# Les numéros d'entrées sont ceux affichés par bin/simcockpit-gui.
+
+cards:
+  io32:
+    product: USB32I04AD       # EFDE IO32 (transpondeur)
+  mcp:
+    product: IOCard-MCP       # OpenCockpits MCP (pilote automatique)
+  dme:
+    product: DME USB          # EFDE DME (indicateur Collins IND-42C)
+  cdu:
+    product: USBFMC V1.0      # OpenCockpits CDU 737 (clavier + voyants)

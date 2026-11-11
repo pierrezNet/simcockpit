@@ -1,30 +1,6 @@
-# Description du cockpit : quelles cartes, quelles commandes, sur quelles entrées.
-# Les numéros d'entrées sont ceux affichés par ./simcockpit-gui (numérotation SIOC).
-
-cards:
-  io32:                       # nom libre, utilisé plus bas
-    product: USB32I04AD       # EFDE IO32
-    # usb_port: "1-14"        # à préciser quand plusieurs cartes identiques sont branchées
-  mcp:
-    product: IOCard-MCP       # OpenCockpits MCP
-  dme:
-    product: DME USB          # EFDE DME (indicateur Collins IND-42C)
+# Avro RJ85, logique simulée : MCP (molettes, afficheurs, modes du pilote automatique RJ).
 
 instruments:
-  transpondeur:
-    label: Transpondeur
-    card: io32
-    controls:
-      code:
-        type: octal_digits    # 4 molettes, chacune codée en binaire sur 3 entrées (bit 0 en premier)
-        inputs: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]
-      mode:
-        type: selector        # la 1re position active de la liste l'emporte
-        positions:            # (en ON, le contact STBY reste aussi fermé)
-          "ON": 12
-          STBY: 13
-        default: "OFF"        # aucune position active
-
   mcp:
     label: MCP (pilote automatique)
     card: mcp
@@ -100,13 +76,3 @@ instruments:
         fd_right: 13            # interrupteur F/D droit
         at_arm: 30              # A/T ARM (1 = armé)
         disengage: 14           # barre DISENGAGE (0 = baissée)
-
-  dme:
-    label: DME (Collins IND-42C)
-    card: dme
-    controls:
-      indicateur:
-        type: dme_indicator     # SEL : ID → KT → MIN ; PWR : marche/arrêt
-        channel: 1              # IND-42C : canal fixé par câblage (1, 2 ou 3)
-        self_test: 2.0          # durée du test des segments à la mise sous tension (s)
-        # backlight: 200        # rétroéclairage fixe 1-255 ; sans cette ligne : cellule photo

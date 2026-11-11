@@ -53,7 +53,7 @@ sudo udevadm control --reload && sudo udevadm trigger
 ### Fenêtre de test des cartes
 
 ```sh
-./simcockpit-gui
+bin/simcockpit-gui
 ```
 
 Un onglet par carte détectée :
@@ -74,8 +74,8 @@ et la mise en marche ou l'arrêt.
 ### Panneau virtuel (logique du cockpit)
 
 ```sh
-./cockpit-panel            # lit cockpit.yaml
-./cockpit-panel autre.yaml
+bin/cockpit-panel                                # Avro RJ85, logique simulée
+bin/cockpit-panel config/avions/b738-laminar     # Boeing 737-800 de Laminar (X-Plane)
 ```
 
 Le panneau connecte les cartes déclarées dans la configuration, applique la logique de
@@ -84,13 +84,13 @@ voyants du matériel. Après une modification du fichier YAML, cliquez sur « Re
 configuration ».
 
 > Les afficheurs du MCP ne restent allumés **que tant qu'un programme lit la carte**.
-> Gardez donc `cockpit-panel` ou `simcockpit-gui` ouvert.
+> Gardez donc `bin/cockpit-panel` ou `bin/simcockpit-gui` ouvert.
 
 ### Mode développement
 
 ```sh
-./simcockpit-gui --dev
-./cockpit-panel --dev [autre.yaml]
+bin/simcockpit-gui --dev
+bin/cockpit-panel --dev [config/avions/…]
 ```
 
 La fenêtre se relance d'elle-même dès qu'un fichier Python du projet est enregistré (et,
@@ -100,36 +100,53 @@ suivante. Fermer la fenêtre arrête tout.
 ### Ligne de commande
 
 ```sh
-python3 -m simcockpit list [--all]        # détecter et classer les cartes
-python3 -m simcockpit watch [--axes]      # changements d'entrées (anti-rebond 50 ms)
-python3 -m simcockpit diag -s 10          # repérer les entrées instables
-python3 -m simcockpit check               # assistant : tester les entrées borne par borne
-python3 -m simcockpit outputs             # assistant : tester les sorties une par une
-python3 -m simcockpit listen --port 1-14  # trames brutes, sans rien envoyer
-python3 -m simcockpit send --port 1-14 "…" # envoyer une trame brute (essais)
+bin/simcockpit list [--all]               # détecter et classer les cartes
+bin/simcockpit watch [--axes]             # changements d'entrées (anti-rebond 50 ms)
+bin/simcockpit diag -s 10                 # repérer les entrées instables
+bin/simcockpit check                      # assistant : tester les entrées borne par borne
+bin/simcockpit outputs                    # assistant : tester les sorties une par une
+bin/simcockpit listen --port 1-14         # trames brutes, sans rien envoyer
+bin/simcockpit send --port 1-14 "…"       # envoyer une trame brute (essais)
 ```
 
 ### Avec X-Plane 12
 
 ```sh
-./cockpit-panel b738.yaml     # MCP relié au Boeing 737-800 de Laminar
+bin/cockpit-panel config/avions/b738-laminar     # MCP relié au Boeing 737-800 de Laminar
 ```
 
 Lancez X-Plane (le port UDP 49000 est ouvert par défaut) et chargez l'avion. Le panneau
 affiche « X-Plane : connecté » dès que le simulateur répond, et se reconnecte seul s'il
 redémarre. À la connexion, la position des interrupteurs du MCP est envoyée à l'avion.
 
-## Configuration : `cockpit.yaml`
+## Configuration : `config/`
 
-Une carte est désignée par son nom USB. Ajoutez son port USB (`usb_port`, affiché par
-`list`) si plusieurs cartes identiques sont branchées. Les numéros d'entrées sont ceux
-affichés par `simcockpit-gui`.
+```
+config/
+├── materiel.yaml           # cartes physiques, décrites une seule fois
+└── avions/
+    ├── rj85-simule/        # Avro RJ85, logique simulée (sans X-Plane)
+    │   ├── dme.yaml
+    │   ├── mcp.yaml
+    │   └── transpondeur.yaml
+    └── b738-laminar/       # Boeing 737-800 de Laminar (X-Plane 12)
+        ├── mcp.yaml
+        └── sim.yaml        # liaison X-Plane
+```
+
+- **`materiel.yaml`** déclare les cartes (section `cards`). Une carte est désignée par son
+  nom USB ; ajoutez `usb_port` (affiché par `list`) si plusieurs cartes identiques sont
+  branchées.
+- **Un avion est un dossier.** Chaque fichier y apporte un ou plusieurs instruments
+  (section `instruments`), et l'un d'eux peut déclarer la liaison simulateur (`sim`).
+  Les onglets suivent l'ordre alphabétique des fichiers. Seules les cartes utilisées par
+  l'avion sont ouvertes.
+- Pour un nouvel avion, copiez un dossier et adaptez-le. Un fichier YAML unique et
+  complet (`cards` + `instruments`) reste accepté.
+
+Les numéros d'entrées sont ceux affichés par `simcockpit-gui`. Exemple d'instrument :
 
 ```yaml
-cards:
-  mcp:
-    product: IOCard-MCP
-
 instruments:
   mcp:
     label: MCP (pilote automatique)
@@ -161,7 +178,13 @@ instruments:
 | `sim_leds` | voyants du MCP qui suivent des datarefs X-Plane | `leds` |
 | `rj_autopilot` | modes du pilote automatique de l'Avro RJ sur le MCP (voyants compris) | `buttons`, `fd_left`, `fd_right`, `at_arm`, `disengage` |
 
-Options communes à tous les types : `display` (afficheur), `led` (voyant), `leading_zeros`.
+Options communes à tous les types : `display` (afficheur), `led` (voyant), et pour
+l'afficheur :
+- `leading_zeros: true` : tous les chiffres remplis (cap « 045 ») ;
+- `min_digits: 3` : au moins 3 chiffres (altitude 0 → « 000 », 10000 → « 10000 ») ;
+- `blank_when: 0` : afficheur éteint pour cette valeur ;
+- `blank_unless: <dataref>` : afficheur éteint tant que ce dataref vaut 0 (avec X-Plane
+  connecté), par exemple la fenêtre V/S du 737 tant que le mode V/S n'est pas engagé.
 
 Liaison X-Plane (section `sim: {type: xplane, host, port}` en tête du fichier) :
 - `encoder` et `speed_encoder` : `dataref` (valeur écrite quand on tourne, et affichée
@@ -172,7 +195,7 @@ Liaison X-Plane (section `sim: {type: xplane, host, port}` en tête du fichier) 
 
 Les noms de datarefs et de commandes se trouvent dans `X-Plane 12/Resources/plugins/`
 (`DataRefs.txt`, `Commands.txt`) et, pour un avion qui définit les siens, dans ses
-scripts (voir `b738.yaml`).
+scripts (voir `config/avions/b738-laminar/mcp.yaml`).
 
 À noter :
 - Les valeurs codées sur plusieurs entrées (transpondeur, sélecteurs) sont filtrées en
@@ -273,6 +296,8 @@ rejouent des captures réelles (`tests/data/`).
 ## Structure du projet
 
 ```
+bin/                lanceurs : simcockpit-gui, cockpit-panel, simcockpit (ligne de commande)
+config/             configuration : matériel et un dossier par avion
 simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc)
 simcockpit/diag/    bruit, assistants de test des entrées et des sorties
 simcockpit/logic/   configuration, types de commandes, moteur, atmosphère standard

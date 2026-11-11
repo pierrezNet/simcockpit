@@ -1,0 +1,5 @@
+#!/bin/sh
+# Panneau virtuel (logique métier) ; par défaut l'avion config/avions/rj85-simule.
+# Autre avion : bin/cockpit-panel config/avions/b738-laminar
+# --dev : relance automatique à chaque modification du code ou de la configuration.
+cd "$(dirname "$0")/.." && exec .venv/bin/python -m simcockpit.panel "$@"

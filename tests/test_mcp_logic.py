@@ -88,7 +88,7 @@ class TestSpeed(unittest.TestCase):
 
 class TestEngineReplay(unittest.TestCase):
     def test_knob_capture_drives_values_and_outputs(self):
-        eng = Engine(config.load(os.path.join(ROOT, "cockpit.yaml")))
+        eng = Engine(config.load(os.path.join(ROOT, "config/avions/rj85-simule")))
         dec, last, prev_t = BitmapDecoder(), {}, None
         for t, pkt in frames("mcp_knobs.txt"):
             # la capture ne garde que les trames qui changent : on consulte quand même
@@ -123,14 +123,14 @@ class TestEngineReplay(unittest.TestCase):
         self.assertEqual(out.leds, 0)        # A/T ARM rebasculé à la fin
 
     def test_leading_zeros_for_course(self):
-        eng = Engine(config.load(os.path.join(ROOT, "cockpit.yaml")))
+        eng = Engine(config.load(os.path.join(ROOT, "config/avions/rj85-simule")))
         eng.poll(0.0)                                   # publie les valeurs initiales
         p0, _ = eng.outputs["mcp"].display_frames()
         # CRS1 « 000 » (n2 n1 n0), IAS « 250 » (n5 n4 n3), HDG « 000 », ALT « 10··· » (n10 n9)
         self.assertEqual(p0.hex(" "), "00 00 25 00 00 01 00 00")
 
     def test_mach_display_and_conversion(self):
-        eng = Engine(config.load(os.path.join(ROOT, "cockpit.yaml")))
+        eng = Engine(config.load(os.path.join(ROOT, "config/avions/rj85-simule")))
         speed = eng.cockpit.instruments["mcp"].controls["vitesse"]
         speed.altitude_control.value = 30000
         speed.value = 280

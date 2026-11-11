@@ -1,4 +1,0 @@
-#!/bin/sh
-# Lance le panneau virtuel (logique métier) ; par défaut avec cockpit.yaml.
-# --dev : relance automatique à chaque modification du code ou du YAML.
-cd "$(dirname "$0")" && exec .venv/bin/python -m simcockpit.panel "$@"

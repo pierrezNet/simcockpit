@@ -69,7 +69,7 @@ def mcp_rest():
 
 class TestEngineWithSim(unittest.TestCase):
     def setUp(self):
-        self.eng = Engine(config.load("b738.yaml"))
+        self.eng = Engine(config.load("config/avions/b738-laminar"))
         self.state = mcp_rest()
         self.eng.feed("mcp", self.state, 0.0, active_level=1)
         self.eng.poll(0.1)
@@ -119,6 +119,35 @@ class TestEngineWithSim(unittest.TestCase):
         self.assertIn(("cmd", "laminar/B738/autopilot/disconnect_toggle"), actions)
         actions = self.eng.sim_step({"laminar/B738/autopilot/disconnect_pos": 1.0}, True, 3.0)
         self.assertNotIn(("cmd", "laminar/B738/autopilot/disconnect_toggle"), actions)
+
+    def test_display_options(self):
+        from simcockpit.hw import mcp
+        from simcockpit.logic.controls import Encoder
+        alt = Encoder("alt", [2, 3], min=0, max=41000, step=100, display="ALT", min_digits=3)
+        vs = Encoder("vs", [10, 11], min=-7900, max=6000, step=100, display="VS",
+                     blank_unless="laminar/B738/autopilot/vs_status")
+        self.assertEqual(alt.shown(0), ("000", False))          # min_digits: 3
+        self.assertEqual(alt.shown(10000), ("10000", False))
+        self.assertEqual(vs.shown(-500), (-500, False))         # X-Plane absent : affiché
+        vs.sim_connected = True
+        vs.on_sim("laminar/B738/autopilot/vs_status", 0.0, 1.0)
+        self.assertEqual(vs.shown(-500), (None, False))         # mode V/S désengagé : éteint
+        vs.on_sim("laminar/B738/autopilot/vs_status", 1.0, 2.0)
+        self.assertEqual(vs.shown(-500), (-500, False))
+        self.assertIsNotNone(vs.poll(2.0))                      # réaffiché au changement
+        # bout à bout : l'altitude 0 de la config 737 s'affiche « 000 » sur le MCP
+        self.connect({"sim/cockpit2/autopilot/altitude_dial_ft": 0.0})
+        p0, p1 = self.eng.outputs["mcp"].display_frames()
+        # ALT de gauche à droite = page 0 n10 n9, page 1 n2 n1 n0 (demi-octet k : octet k//2)
+        digits = [p0[5] & 0x0F, p0[4] >> 4, p1[1] & 0x0F, p1[0] >> 4, p1[0] & 0x0F]
+        B = mcp.DIGIT_BLANK
+        self.assertEqual(digits, [B, B, 0, 0, 0])
+
+    def test_blank_when(self):
+        from simcockpit.logic.controls import Encoder
+        e = Encoder("vs", [10, 11], min=-1000, max=1000, step=100, display="VS", blank_when=0)
+        self.assertEqual(e.shown(0), (None, False))
+        self.assertEqual(e.shown(100), (100, False))
 
     def test_mach_mode_from_sim(self):
         self.connect({"sim/cockpit2/autopilot/airspeed_dial_kts_mach": 0.78,

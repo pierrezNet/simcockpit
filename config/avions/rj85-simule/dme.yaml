@@ -1,0 +1,12 @@
+# Avro RJ85, logique simulée : indicateur DME Collins IND-42C (données simulées dans le panneau).
+
+instruments:
+  dme:
+    label: DME (Collins IND-42C)
+    card: dme
+    controls:
+      indicateur:
+        type: dme_indicator     # SEL : ID → KT → MIN ; PWR : marche/arrêt
+        channel: 1              # IND-42C : canal fixé par câblage (1, 2 ou 3)
+        self_test: 2.0          # durée du test des segments à la mise sous tension (s)
+        # backlight: 200        # rétroéclairage fixe 1-255 ; sans cette ligne : cellule photo

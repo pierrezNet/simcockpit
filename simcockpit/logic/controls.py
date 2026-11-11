@@ -12,9 +12,13 @@ from .atmosphere import cas_to_mach, mach_to_cas
 class Control:
     type = "?"
 
-    def __init__(self, name, indexes, delay=0.05, display=None, led=None, leading_zeros=False):
+    def __init__(self, name, indexes, delay=0.05, display=None, led=None, leading_zeros=False,
+                 min_digits=None, blank_when=None, blank_unless=None):
         self.name = name
         self.leading_zeros = leading_zeros   # afficher « 045 » plutôt que « 45 » (cap, route)
+        self.min_digits = min_digits         # au moins n chiffres : 0 → « 000 » (altitude 737)
+        self.blank_when = blank_when         # afficheur éteint pour cette valeur
+        self.blank_unless = blank_unless     # dataref : afficheur éteint tant qu'il vaut 0
         self.indexes = list(indexes)
         self._deb = GroupDebouncer(self.indexes, delay)
         self.value = None
@@ -26,10 +30,13 @@ class Control:
 
     def sim_datarefs(self):
         """Datarefs à suivre."""
-        return []
+        return [self.blank_unless] if self.blank_unless else []
 
     def on_sim(self, name, value, t):
         """Nouvelle valeur d'un dataref suivi."""
+        self.__dict__.setdefault("_last_sim", {})[name] = value
+        if name == self.blank_unless:
+            self._changed = True              # réafficher (allumé ou éteint)
 
     def sim_sync(self):
         """X-Plane vient d'apparaître : renvoyer l'état du matériel (interrupteurs…)."""
@@ -63,6 +70,24 @@ class Control:
     def display_value(self, value):
         """Ce qu'il faut afficher pour `value` : (valeur ou texte, point décimal allumé ?)."""
         return value, False
+
+    def display_blank(self, value):
+        """Afficheur à éteindre ? (`blank_when`, ou `blank_unless` à 0 avec X-Plane connecté)."""
+        if self.blank_when is not None and value == self.blank_when:
+            return True
+        if self.blank_unless and self.sim_connected:
+            return not self.__dict__.get("_last_sim", {}).get(self.blank_unless, 1)
+        return False
+
+    def shown(self, value):
+        """Texte ou nombre à afficher, compte tenu de `blank_*` et `min_digits` ; None = éteint."""
+        if self.display_blank(value):
+            return None, False
+        shown, dot = self.display_value(value)
+        if self.min_digits and isinstance(shown, int):
+            n = self.min_digits
+            shown = f"{shown:0{n}d}" if shown >= 0 else "-" + f"{-shown:0{n}d}"
+        return shown, dot
 
     def describe(self):
         return f"{self.type} sur {self.indexes}"
@@ -147,11 +172,13 @@ class Switch(Control):
             self._sim("cmd", self.toggle_command)
 
     def sim_datarefs(self):
-        return [self.state_dataref] if self.state_dataref else []
+        return super().sim_datarefs() + ([self.state_dataref] if self.state_dataref else [])
 
     def on_sim(self, name, value, t):
-        self._sim_state = value
-        self._check_toggle(t)
+        super().on_sim(name, value, t)
+        if name == self.state_dataref:
+            self._sim_state = value
+            self._check_toggle(t)
 
     def sim_sync(self):
         self._push()
@@ -225,10 +252,10 @@ class Encoder(Control):
         return self._clamp(round(value))
 
     def sim_datarefs(self):
-        return [self.dataref] if self.dataref else []
+        return super().sim_datarefs() + ([self.dataref] if self.dataref else [])
 
     def on_sim(self, name, value, t):
-        self.__dict__.setdefault("_last_sim", {})[name] = value
+        super().on_sim(name, value, t)
         if name != self.dataref or t < self._local_until:
             return                      # on vient de tourner : X-Plane n'a pas encore suivi
         v = self.from_sim(value)
@@ -330,8 +357,8 @@ class SpeedEncoder(Encoder):
         return super().sim_datarefs() + ([self.mach_dataref] if self.mach_dataref else [])
 
     def on_sim(self, name, value, t):
-        self.__dict__.setdefault("_last_sim", {})[name] = value
         if name == self.mach_dataref:
+            self.__dict__.setdefault("_last_sim", {})[name] = value
             mode = "MACH" if value >= 0.5 else "IAS"
             if mode != self.mode:
                 self._values[self.mode] = self.value

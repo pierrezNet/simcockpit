@@ -1,6 +1,6 @@
-"""Application « panneau virtuel » : lit cockpit.yaml, connecte les cartes, affiche les instruments.
+"""Application « panneau virtuel » : lit la configuration, connecte les cartes, affiche les instruments.
 
-Lancement : .venv/bin/python -m simcockpit.panel [cockpit.yaml]
+Lancement : .venv/bin/python -m simcockpit.panel [config/avions/rj85-simule | dossier d'avion | fichier .yaml]
 """
 
 import sys
@@ -259,8 +259,14 @@ class ControlWidget(QWidget):
         if isinstance(self.ctrl, SpeedEncoder):
             self.lcd.setText(f"IAS {value}" if self.ctrl.mode == "IAS" else f"M .{value:02d}")
         elif isinstance(self.ctrl, Encoder):
+            shown, _ = self.ctrl.shown(value)        # min_digits, blank_when, blank_unless
             width = len(str(self.ctrl.max)) if self.ctrl.leading_zeros else 0
-            self.lcd.setText(f"{value:0{width}d}" if width else str(value))
+            if shown is None:
+                self.lcd.setText("")
+            elif isinstance(shown, int) and width:
+                self.lcd.setText(f"{shown:0{width}d}")
+            else:
+                self.lcd.setText(str(shown))
         elif isinstance(self.ctrl, OctalDigits):
             self.lcd.setText(value)
         elif isinstance(self.ctrl, Selector):
@@ -401,7 +407,7 @@ class PanelWindow(QMainWindow):
 def main():
     prepare()
     app = QApplication(sys.argv)
-    path = sys.argv[1] if len(sys.argv) > 1 else "cockpit.yaml"
+    path = sys.argv[1] if len(sys.argv) > 1 else "config/avions/rj85-simule"
     win = PanelWindow(path)
     win.show()
     return app.exec()

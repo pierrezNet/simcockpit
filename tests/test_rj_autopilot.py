@@ -104,7 +104,7 @@ class TestRjAutopilot(unittest.TestCase):
         self.assertEqual(self.ap.lateral, "HDG")
 
     def test_engine_sends_led_frame(self):
-        eng = Engine(config.load("cockpit.yaml"))
+        eng = Engine(config.load("config/avions/rj85-simule"))
         ap = eng.cockpit.instruments["mcp"].controls["pilote_auto"]
         eng.poll(0.0)
         eng._pending["mcp"].clear()

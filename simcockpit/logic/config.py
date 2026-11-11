@@ -1,8 +1,19 @@
-"""Chargement et validation de cockpit.yaml."""
+"""Chargement et validation de la configuration du cockpit.
 
+Deux formes :
+- un fichier unique (cartes + instruments + liaison simulateur) ;
+- un dossier d'avion (ex. config/avions/b738-laminar/) : chaque fichier .yaml du dossier
+  apporte des instruments (et éventuellement `sim:`), et les cartes viennent du fichier
+  `materiel.yaml` trouvé dans le dossier ou l'un de ses parents. Seules les cartes
+  utilisées par les instruments sont ouvertes.
+"""
+
+import os
 from dataclasses import dataclass, field
 
 import yaml
+
+MATERIEL = "materiel.yaml"
 
 from ..hw import mcp
 from ..hw.cards import KNOWN, classify
@@ -35,9 +46,64 @@ class ConfigError(ValueError):
     pass
 
 
-def load(path):
+def _read(path):
     with open(path) as f:
-        return parse(yaml.safe_load(f) or {})
+        text = f.read()
+    for n, line in enumerate(text.splitlines(), 1):
+        if line[:len(line) - len(line.lstrip())].count("\t"):
+            raise ConfigError(f"{path}, ligne {n} : tabulation dans l'indentation ;"
+                              " YAML n'accepte que des espaces")
+    try:
+        data = yaml.safe_load(text) or {}
+    except yaml.YAMLError as e:
+        mark = getattr(e, "problem_mark", None)
+        where = f", ligne {mark.line + 1}" if mark else ""
+        raise ConfigError(f"{path}{where} : YAML invalide ({getattr(e, 'problem', e)})") from None
+    if not isinstance(data, dict):
+        raise ConfigError(f"{path} : le fichier doit contenir des sections (cards, instruments…)")
+    return data
+
+
+def find_materiel(folder):
+    """materiel.yaml du dossier ou du plus proche parent ; None s'il n'y en a pas."""
+    folder = os.path.abspath(folder)
+    while True:
+        candidate = os.path.join(folder, MATERIEL)
+        if os.path.isfile(candidate):
+            return candidate
+        parent = os.path.dirname(folder)
+        if parent == folder:
+            return None
+        folder = parent
+
+
+def load(path):
+    if not os.path.isdir(path):
+        return parse(_read(path))
+    materiel = find_materiel(path)
+    if materiel is None:
+        raise ConfigError(f"{path} : aucun {MATERIEL} dans ce dossier ni au-dessus")
+    data = {"cards": dict(_read(materiel).get("cards") or {}), "instruments": {}}
+    files = sorted(f for f in os.listdir(path) if f.endswith((".yaml", ".yml")) and f != MATERIEL)
+    if not files:
+        raise ConfigError(f"{path} : aucun fichier .yaml d'instruments")
+    for name in files:
+        part = _read(os.path.join(path, name))
+        for key in part:
+            if key not in ("cards", "instruments", "sim"):
+                raise ConfigError(f"{name} : section inconnue « {key} »")
+        for iid, spec in (part.get("instruments") or {}).items():
+            if iid in data["instruments"]:
+                raise ConfigError(f"{name} : instrument « {iid} » déjà défini dans un autre fichier")
+            data["instruments"][iid] = spec
+        data["cards"].update(part.get("cards") or {})      # carte propre à cet avion
+        if "sim" in part:
+            if "sim" in data:
+                raise ConfigError(f"{name} : section sim déjà définie dans un autre fichier")
+            data["sim"] = part["sim"]
+    used = {spec.get("card") for spec in data["instruments"].values()}
+    data["cards"] = {cid: c for cid, c in data["cards"].items() if cid in used}
+    return parse(data)
 
 
 def parse(data):

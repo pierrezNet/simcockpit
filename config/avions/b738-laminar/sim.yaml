@@ -1,0 +1,7 @@
+# Boeing 737-800 de Laminar (X-Plane 12) : liaison UDP avec X-Plane.
+# Lancement : bin/cockpit-panel config/avions/b738-laminar  (X-Plane lancé, 737 chargé)
+
+sim:
+  type: xplane
+  host: 127.0.0.1
+  port: 49000

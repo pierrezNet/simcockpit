@@ -1,4 +1,4 @@
-"""Moteur : relie les cartes physiques aux instruments décrits dans cockpit.yaml.
+"""Moteur : relie les cartes physiques aux instruments décrits dans la configuration.
 
 Le cœur (`feed`, `poll`, `outputs`) n'accède pas au matériel : on peut le nourrir avec
 une capture. `connect` / `step` gèrent les vraies cartes.
@@ -82,7 +82,7 @@ class Engine:
         if out is None or (ctrl.display is None and ctrl.led is None):
             return
         if ctrl.display is not None:
-            shown, dot = ctrl.display_value(value)
+            shown, dot = ctrl.shown(value)
             out.set_display(ctrl.display, shown, blank_leading=not ctrl.leading_zeros)
             if ctrl.display in mcp.DOTS:
                 out.set_dot(ctrl.display, dot)
@@ -125,6 +125,8 @@ class Engine:
             self.sim_connected = connected
             for ctrl in self._controls():
                 ctrl.sim_connected = connected
+                if ctrl.display is not None:
+                    ctrl._changed = True          # réafficher (blank_unless dépend de la liaison)
             if connected:
                 for ctrl in self._controls():
                     ctrl.sim_sync()               # pousse la position des interrupteurs
