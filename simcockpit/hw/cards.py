@@ -68,6 +68,17 @@ EFDE_DME = CardType(
     verified="boutons SEL et PWR ; écran et voyants (protocole EFDE, validé à la webcam)",
 )
 
+OC_RADIO_AIRBUS = CardType(
+    key="oc_radio_airbus",
+    label="OpenCockpits radio Airbus",
+    products=("IOCard-RadioAirb",),
+    protocol="bitmap",         # vérifié : muette avant l'init, puis état complet de 64 bits ~40 ms
+    active_level=1,            # poussoirs actifs à 0 (comme le MCP), ON/OFF actif à 1
+    inputs=64, outputs=0, axes=0,
+    out_protocol="radio_airbus",   # afficheurs et voyants : hw/radio_airbus.py
+    verified="entrées ; 2 afficheurs, points décimaux et 8 voyants (webcam)",
+)
+
 OC_USBFMC = CardType(
     key="oc_usbfmc",
     label="OpenCockpits CDU",
@@ -85,7 +96,7 @@ UNKNOWN = CardType(
     active_level=1, inputs=0, outputs=0, axes=0, send_init=False,
 )
 
-KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME, OC_USBFMC)
+KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME, OC_USBFMC, OC_RADIO_AIRBUS)
 
 
 def classify(product: str) -> CardType:

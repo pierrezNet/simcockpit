@@ -23,6 +23,7 @@ officiel d'OpenCockpits, qui ne fonctionne que sous Windows.
 | EFDE IO32 | `USB32I04AD` | ✅ 32 entrées, 4 axes | ✅ 32 sorties (testée sur une seule) |
 | OpenCockpits MCP (pilote automatique 737) | `IOCard-MCP` | ✅ boutons, interrupteurs, 6 encodeurs | ✅ 6 afficheurs, 15 voyants, point décimal |
 | EFDE DME (réplique Collins IND-42) | `DME USB` | ✅ boutons SEL et PWR | ✅ distance, texte, 9 voyants, rétroéclairage, marche/arrêt |
+| OpenCockpits radio Airbus | `IOCard-RadioAirb` | ✅ 8 poussoirs, ON/OFF, double rotatif | ✅ 2 afficheurs de 6 chiffres, points décimaux, 8 voyants |
 | OpenCockpits CDU 737 | `USBFMC V1.0` | ✅ 70 touches | ✅ 5 voyants (OFST, MSG, EXEC, DSPY, FAIL) |
 | OpenCockpits USB Expansion + Master Card | `IOCardUSB` | ✅ 72 entrées (la Master Card doit être alimentée) | ⚠️ codage connu, non testé |
 
@@ -68,6 +69,7 @@ une commande passe au premier plan.
 
 Pour le MCP, l'onglet propose aussi un champ par afficheur et un bouton par voyant.
 Pour le CDU, il affiche toutes les touches et un bouton par voyant.
+Pour la radio Airbus, il propose un champ par afficheur (« 118.700 ») et un bouton par voyant.
 Pour le DME, il propose la distance, le texte de droite, les voyants, le rétroéclairage
 et la mise en marche ou l'arrêt.
 
@@ -278,6 +280,15 @@ PWR, `0a` au repos. PWR éteint et rallume l'écran de lui-même. En
 
 Complétez les textes avec des espaces : un octet `00` allume des segments parasites.
 
+**Radio OpenCockpits Airbus** (`IOCard-RadioAirb`). Même réveil et mêmes entrées que le
+MCP. En écriture, deux sortes de trames, selon le bit 7 de l'octet 6 :
+- **afficheurs** (bit 7 à 0) : 12 demi-octets dans les octets 0 à 5, ACTIVE = n5 … n0 et
+  STANDBY = n11 … n6 (codes du MCP) ; les bits 0 à 5 de l'octet 6 allument les points
+  décimaux (`02` : ACTIVE « 888.888 », `08` : STANDBY « 888.888 », voir
+  `simcockpit/hw/radio_airbus.py`) ;
+- **voyants** (octet 6 = `80`) : un bit par voyant dans l'octet 0 (VHF1, VHF2, SEL, VOR,
+  ADF, BFO, NAV, ILS).
+
 **CDU OpenCockpits** (`USBFMC V1.0`, fabricant USB « Opencockpits »). La carte reste muette
 tant qu'on ne lui a rien écrit. Ensuite, chaque appui envoie une trame dont l'octet 0 est
 le numéro de la touche (1 à 88) ; rien n'est envoyé au relâchement. En écriture, l'octet 0
@@ -298,7 +309,7 @@ rejouent des captures réelles (`tests/data/`).
 ```
 bin/                lanceurs : simcockpit-gui, cockpit-panel, simcockpit (ligne de commande)
 config/             configuration : matériel et un dossier par avion
-simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc)
+simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc, radio_airbus)
 simcockpit/diag/    bruit, assistants de test des entrées et des sorties
 simcockpit/logic/   configuration, types de commandes, moteur, atmosphère standard
 simcockpit/gui/     fenêtre de test des cartes

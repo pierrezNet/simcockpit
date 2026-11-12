@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, Q
                                QVBoxLayout,
                                QWidget)
 
-from ..hw import dme, mastercard, mcp, usbfmc
+from ..hw import dme, mastercard, mcp, radio_airbus, usbfmc
 from ..hw.device import Card
 
 ACTIVE = "#2e9e44"       # vert : entrée actionnée
@@ -246,6 +246,8 @@ class CardView(QWidget):
             side.addWidget(self._build_dme())
         if detected.type.out_protocol == "usbfmc":
             side.addWidget(self._build_fmc_leds())
+        if detected.type.out_protocol == "radio_airbus":
+            side.addWidget(self._build_radio())
 
         # --- journal
         side.addWidget(QLabel("Journal"))
@@ -284,6 +286,57 @@ class CardView(QWidget):
         bg = ACTIVE if pressed else REST
         self.key_cells[code].setStyleSheet(f"background:{bg}; color:white; font-weight:bold;"
                                            " border-radius:4px; font-size:11px;")
+
+    def _build_radio(self):
+        """Afficheurs ACTIVE / STANDBY et voyants de la radio Airbus."""
+        self.radio_out = radio_airbus.RadioOutputs()
+        box = QGroupBox("Afficheurs et voyants de la radio")
+        lay = QVBoxLayout(box)
+        form = QGridLayout()
+        self.radio_fields = {}
+        for k, (name, example) in enumerate((("ACTIVE", "118.700"), ("STANDBY", "121.500"))):
+            field = QLineEdit()
+            field.setPlaceholderText(f"ex. {example} (6 chiffres, point après le 3e, 4e ou 5e)")
+            field.returnPressed.connect(self._send_radio_displays)
+            form.addWidget(QLabel(name), k, 0)
+            form.addWidget(field, k, 1)
+            self.radio_fields[name] = field
+        b = QPushButton("Afficher")
+        b.clicked.connect(self._send_radio_displays)
+        form.addWidget(b, 0, 2, 2, 1)
+        lay.addLayout(form)
+        grid = QGridLayout()
+        self.radio_leds = {}
+        for k, name in enumerate(radio_airbus.LEDS):
+            lb = QPushButton(name)
+            lb.setCheckable(True)
+            lb.setStyleSheet("QPushButton:checked { background:#2e9e44; color:white; font-weight:bold; }")
+            lb.toggled.connect(self._send_radio_leds)
+            grid.addWidget(lb, k // 4, k % 4)
+            self.radio_leds[name] = lb
+        lay.addLayout(grid)
+        return box
+
+    def _send_radio_displays(self):
+        try:
+            for name, field in self.radio_fields.items():
+                self.radio_out.set_display(name, field.text().strip())
+            self._write(self.radio_out.display_frame())
+        except (ValueError, OSError) as e:
+            self._log(f"radio : {e}")
+            return
+        self._log("radio : " + "  ".join(f"{n}={f.text() or '-'}" for n, f in self.radio_fields.items()))
+
+    def _send_radio_leds(self, *_):
+        for name, b in self.radio_leds.items():
+            self.radio_out.set_led(name, b.isChecked())
+        try:
+            self._write(self.radio_out.led_frame())
+        except OSError as e:
+            self._log(f"ERREUR écriture : {e}")
+            return
+        lit = [n for n, b in self.radio_leds.items() if b.isChecked()]
+        self._log(f"radio voyants : {', '.join(lit) or 'aucun'}")
 
     def _build_fmc_leds(self):
         box = QGroupBox("Voyants du CDU")
