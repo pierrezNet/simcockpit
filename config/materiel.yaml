@@ -12,3 +12,5 @@ cards:
     product: DME USB          # EFDE DME (indicateur Collins IND-42C)
   cdu:
     product: USBFMC V1.0      # OpenCockpits CDU 737 (clavier + voyants)
+  radio:
+    product: IOCard-RadioAirb # OpenCockpits radio Airbus (fréquences COM / NAV / ADF)

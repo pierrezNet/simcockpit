@@ -16,6 +16,7 @@ from ..logic import config
 from ..hw import dme as dme_hw
 from ..logic.controls import Encoder, OctalDigits, Selector, SpeedEncoder, Switch
 from ..logic.dme_indicator import DmeIndicator
+from ..logic.radio_panel import RadioPanel
 from ..logic.rj_autopilot import RjAutopilot
 from ..gui.qtenv import prepare
 from ..logic.engine import Engine
@@ -219,6 +220,39 @@ class AutopilotWidget(QWidget):
             self.lamps[name].setStyleSheet(POS_ON if on else POS_OFF)
 
 
+class RadioWidget(QWidget):
+    """Boîtier radio : source choisie, fréquences ACTIVE / STANDBY, boutons virtuels."""
+
+    def __init__(self, ctrl):
+        super().__init__()
+        self.ctrl = ctrl
+        lay = QVBoxLayout(self)
+        title = QLabel(f"<b>{ctrl.name}</b> <span style='color:#888'>— {ctrl.describe()}</span>")
+        title.setWordWrap(True)
+        lay.addWidget(title)
+        self.lcd = QLabel()
+        self.lcd.setStyleSheet(LCD.replace("56px", "30px"))
+        lay.addWidget(self.lcd)
+        row = QHBoxLayout()
+        for s in ctrl.sources:
+            b = QPushButton(s.name)
+            b.clicked.connect(lambda _=False, n=s.name: ctrl.select(n))
+            row.addWidget(b)
+        b = QPushButton("⇄ transfert")
+        b.clicked.connect(ctrl.swap)
+        row.addWidget(b)
+        row.addStretch()
+        lay.addLayout(row)
+        self.show_value(None)
+
+    def show_value(self, _value):
+        if not self.ctrl.powered:
+            self.lcd.setText("radio éteinte")
+            return
+        texts, _ = self.ctrl.radio_display()
+        self.lcd.setText(f"{self.ctrl.selected.name}   {texts['ACTIVE']}  ⇄  {texts['STANDBY']}")
+
+
 class ControlWidget(QWidget):
     """Affichage d'une commande selon son type."""
 
@@ -340,6 +374,9 @@ class PanelWindow(QMainWindow):
                 if isinstance(ctrl, RjAutopilot):          # sur toute la largeur, sous les afficheurs
                     w = AutopilotWidget(ctrl)
                     lay.addWidget(w, 100, 0, 1, 3)
+                elif isinstance(ctrl, RadioPanel):
+                    w = RadioWidget(ctrl)
+                    lay.addWidget(w, k // 3, 0, 1, 3)
                 else:
                     w = DmeWidget(ctrl) if isinstance(ctrl, DmeIndicator) else ControlWidget(ctrl)
                     lay.addWidget(w, k // 3, k % 3)

@@ -392,7 +392,8 @@ def make(name, spec):
     from .dme_indicator import DmeIndicator   # ici : ces modules importent Control
     from .rj_autopilot import RjAutopilot
     from .sim_controls import Commands, SimLeds
-    for cls in (DmeIndicator, RjAutopilot, Commands, SimLeds):
+    from .radio_panel import RadioPanel
+    for cls in (DmeIndicator, RjAutopilot, Commands, SimLeds, RadioPanel):
         TYPES.setdefault(cls.type, cls)
     spec = dict(spec)
     kind = spec.pop("type", None)

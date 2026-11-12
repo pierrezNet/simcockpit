@@ -114,7 +114,7 @@ bin/simcockpit send --port 1-14 "…"       # envoyer une trame brute (essais)
 ### Avec X-Plane 12
 
 ```sh
-bin/cockpit-panel config/avions/b738-laminar     # MCP relié au Boeing 737-800 de Laminar
+bin/cockpit-panel config/avions/b738-laminar     # MCP et radio reliés au Boeing 737-800 de Laminar
 ```
 
 Lancez X-Plane (le port UDP 49000 est ouvert par défaut) et chargez l'avion. Le panneau
@@ -133,6 +133,7 @@ config/
     │   └── transpondeur.yaml
     └── b738-laminar/       # Boeing 737-800 de Laminar (X-Plane 12)
         ├── mcp.yaml
+        ├── radio.yaml      # COM1, COM2, NAV1, NAV2
         └── sim.yaml        # liaison X-Plane
 ```
 
@@ -176,6 +177,7 @@ instruments:
 | `encoder` | encodeur rotatif | `inputs`, `min`, `max`, `step`, `wrap`, `invert`, `initial`, `accel` |
 | `speed_encoder` | vitesse avec bascule IAS / Mach (bouton C/O) | `toggle_input`, `toggle_level`, `ias`, `mach`, `altitude_from` |
 | `dme_indicator` | indicateur DME Collins IND-42C sur le DME EFDE | `channel`, `self_test`, `backlight` |
+| `radio_panel` | boîtier radio (radio Airbus) : sources COM/NAV/ADF, bagues, transfert, afficheurs | `sources`, `outer`, `inner`, `transfer`, `power`, `power_on`, `button_level` |
 | `commands` | poussoirs → commandes X-Plane (`inputs: {entrée: commande}`) | `inputs`, `level` |
 | `sim_leds` | voyants du MCP qui suivent des datarefs X-Plane | `leds` |
 | `rj_autopilot` | modes du pilote automatique de l'Avro RJ sur le MCP (voyants compris) | `buttons`, `fd_left`, `fd_right`, `at_arm`, `disengage` |

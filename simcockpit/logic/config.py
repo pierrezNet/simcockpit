@@ -130,6 +130,8 @@ def parse(data):
             if ctrl.display is not None and (out != "mcp" or ctrl.display not in mcp.DISPLAYS):
                 raise ConfigError(f"{iid}.{name} : afficheur {ctrl.display!r} inconnu sur cette carte"
                                   + (f" (connus : {', '.join(mcp.DISPLAYS)})" if out == "mcp" else ""))
+            if hasattr(ctrl, "radio_display") and out != "radio_airbus":
+                raise ConfigError(f"{iid}.{name} : {ctrl.type} demande une radio OpenCockpits Airbus")
             if hasattr(ctrl, "led_states") and out != "mcp":
                 raise ConfigError(f"{iid}.{name} : {ctrl.type} demande une carte MCP")
             if ctrl.led is not None and (out != "mcp" or ctrl.led not in mcp.LEDS):

@@ -13,7 +13,7 @@ import queue
 import time
 from dataclasses import dataclass
 
-from ..hw import manager, mcp
+from ..hw import manager, mcp, radio_airbus
 from ..hw.cards import classify
 from ..hw.device import Card
 
@@ -34,8 +34,10 @@ class Engine:
         self.cards = {}            # id -> Card (connectées)
         self.status = {cid: "non trouvée" for cid in cockpit.cards}
         # état des sorties par carte (seul le protocole MCP est géré pour l'instant)
-        self.outputs = {cid: mcp.McpOutputs() for cid, spec in cockpit.cards.items()
-                        if classify(spec.product).out_protocol == "mcp"}
+        makers = {"mcp": mcp.McpOutputs, "radio_airbus": radio_airbus.RadioOutputs}
+        self.outputs = {cid: makers[classify(spec.product).out_protocol]()
+                        for cid, spec in cockpit.cards.items()
+                        if classify(spec.product).out_protocol in makers}
         self._pending = {cid: {} for cid in cockpit.cards}  # clé de trame -> trame, dans l'ordre
         self._last_write = {}
         # simulateur : connecteur créé à la demande (connect_sim), abonnements par commande
@@ -74,6 +76,14 @@ class Engine:
 
     def _apply_output(self, card_id, ctrl, value):
         out = self.outputs.get(card_id)
+        if isinstance(out, radio_airbus.RadioOutputs) and hasattr(ctrl, "radio_display"):
+            texts, leds = ctrl.radio_display()
+            for name, text in texts.items():
+                out.set_display(name, text)
+            for name in radio_airbus.LEDS:
+                out.set_led(name, bool(leds.get(name)))
+            self._pending[card_id].update({"display": out.display_frame(), "leds": out.led_frame()})
+            return
         if out is not None and hasattr(ctrl, "led_states"):    # commande qui gère plusieurs voyants
             for name, on in ctrl.led_states().items():
                 out.set_led(name, on)
@@ -110,7 +120,9 @@ class Engine:
                     if hasattr(ctrl, "restart"):
                         ctrl.restart(cold=True)             # le DME refait sa mise sous tension
         out = self.outputs.get(card_id)
-        if out is not None:
+        if isinstance(out, radio_airbus.RadioOutputs):
+            self._pending[card_id].update({"display": out.display_frame(), "leds": out.led_frame()})
+        elif out is not None:
             p0, p1 = out.display_frames()
             self._pending[card_id].update({"page0": p0, "page1": p1, "leds": out.led_frame()})
 
