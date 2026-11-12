@@ -98,7 +98,9 @@ def classify(product: str) -> CardType:
 # Fabricants de cartes de cockpit : une carte inconnue de ces fabricants est montrée
 # (en écoute seule) au lieu d'être ignorée comme un clavier ou une souris.
 # Les cartes OpenCockpits récentes (USBFMC) s'annoncent « Opencockpits », les autres « Manuel Velez ».
-COCKPIT_MAKERS = {"Manuel Velez": "OpenCockpits", "Opencockpits": "OpenCockpits", "EFDE": "EFDE"}
+# Le bus des jauges EFDE (FDBUS) s'annonce « E.F.D.E. », les autres cartes EFDE « EFDE ».
+COCKPIT_MAKERS = {"Manuel Velez": "OpenCockpits", "Opencockpits": "OpenCockpits", "EFDE": "EFDE",
+                  "E.F.D.E.": "EFDE"}
 
 
 def maker(manufacturer: str):
