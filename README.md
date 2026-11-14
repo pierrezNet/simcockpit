@@ -141,7 +141,8 @@ config/
         ├── cdu.yaml        # CDU → FMS du commandant (sim/FMS/…)
         ├── mcp.yaml
         ├── radio.yaml      # COM1, COM2, NAV1, NAV2
-        └── sim.yaml        # liaison X-Plane
+        ├── sim.yaml        # liaison X-Plane
+        └── transpondeur.yaml
 ```
 
 - **`materiel.yaml`** déclare les cartes (section `cards`). Une carte est désignée par son
@@ -179,8 +180,8 @@ instruments:
 | Type | Rôle | Paramètres principaux |
 |---|---|---|
 | `switch` | interrupteur ou poussoir | `input` |
-| `selector` | sélecteur à positions (la première position active l'emporte) | `positions`, `default` |
-| `octal_digits` | chiffres codés en binaire sur 3 entrées (transpondeur) | `inputs` |
+| `selector` | sélecteur à positions (la première position active l'emporte) | `positions`, `default`, `dataref`, `dataref_values` |
+| `octal_digits` | chiffres codés en binaire sur 3 entrées (transpondeur) | `inputs`, `dataref` |
 | `encoder` | encodeur rotatif | `inputs`, `min`, `max`, `step`, `wrap`, `invert`, `initial`, `accel` |
 | `speed_encoder` | vitesse avec bascule IAS / Mach (bouton C/O) | `toggle_input`, `toggle_level`, `ias`, `mach`, `altitude_from` |
 | `dme_indicator` | indicateur DME Collins IND-42C sur le DME EFDE | `channel`, `self_test`, `backlight` |
@@ -203,6 +204,9 @@ Liaison X-Plane (section `sim: {type: xplane, host, port}` en tête du fichier) 
 - `encoder` et `speed_encoder` : `dataref` (valeur écrite quand on tourne, et affichée
   quand elle change dans le simulateur) ; pour la vitesse, `mach_dataref` et
   `toggle_command` (bouton C/O) ;
+- `octal_digits` et `selector` : `dataref` (et pour le sélecteur `dataref_values`,
+  libellé → nombre) ; la position du matériel est poussée vers X-Plane à chaque
+  changement et à la connexion (ex. code et mode du transpondeur) ;
 - `switch` : `command_on` / `command_off`, ou `toggle_command` avec `state_dataref` et
   `state_on` pour un interrupteur que le simulateur ne connaît qu'en bascule ; `invert`.
 

@@ -93,11 +93,39 @@ class Control:
         return f"{self.type} sur {self.indexes}"
 
 
-class OctalDigits(Control):
-    """Chiffres codés en binaire sur 3 entrées chacun (bit 0 en premier) : ex. code transpondeur."""
+class PushToSim:
+    """Valeur absolue tenue par le matériel (molettes, sélecteur) et poussée vers X-Plane :
+    à chaque changement et à la connexion. `dataref_values` traduit la valeur (libellé →
+    nombre) ; sans lui, la valeur doit être numérique (ex. code transpondeur « 2000 »)."""
+
+    def _init_push(self, dataref, dataref_values):
+        self.push_dataref = dataref
+        self.push_values = dict(dataref_values) if dataref_values else None
+
+    def poll(self, t):
+        v = super().poll(t)
+        if v is not None:
+            self._push()
+        return v
+
+    def _push(self):
+        if not (self.push_dataref and self.sim_connected) or self.value is None:
+            return
+        value = self.push_values.get(self.value) if self.push_values else self.value
+        if value is not None:
+            self._sim("dref", self.push_dataref, float(value))
+
+    def sim_sync(self):
+        self._push()
+
+
+class OctalDigits(PushToSim, Control):
+    """Chiffres codés en binaire sur 3 entrées chacun (bit 0 en premier) : ex. code transpondeur.
+    Avec `dataref`, le code est écrit dans X-Plane (« 2000 » → 2000)."""
     type = "octal_digits"
 
-    def __init__(self, name, inputs, **kw):
+    def __init__(self, name, inputs, dataref=None, **kw):
+        self._init_push(dataref, None)
         self.groups = [list(g) for g in inputs]
         for g in self.groups:
             if len(g) != 3:
@@ -108,11 +136,13 @@ class OctalDigits(Control):
         return "".join(str(bits[a] | bits[b] << 1 | bits[c] << 2) for a, b, c in self.groups)
 
 
-class Selector(Control):
-    """Sélecteur à positions : la 1re position active de la liste l'emporte, sinon `default`."""
+class Selector(PushToSim, Control):
+    """Sélecteur à positions : la 1re position active de la liste l'emporte, sinon `default`.
+    Avec `dataref` et `dataref_values` (libellé → nombre), la position est écrite dans X-Plane."""
     type = "selector"
 
-    def __init__(self, name, positions, default="OFF", **kw):
+    def __init__(self, name, positions, default="OFF", dataref=None, dataref_values=None, **kw):
+        self._init_push(dataref, dataref_values)
         self.positions = dict(positions)   # libellé -> entrée, dans l'ordre de priorité
         self.default = default
         super().__init__(name, self.positions.values(), **kw)
