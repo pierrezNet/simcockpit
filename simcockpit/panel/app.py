@@ -104,6 +104,29 @@ def dme_cells(ctrl):
     return cells, dot, [x for x in lit.values() if x]
 
 
+def virtual_section(parent_layout):
+    """Section « Commandes virtuelles » repliable, fermée par défaut ; retourne son layout."""
+    box = QGroupBox("Commandes virtuelles (remplacent le matériel)")
+    box.setCheckable(True)
+    box.setChecked(False)
+    outer = QVBoxLayout(box)
+    inner = QWidget()
+    inner.setVisible(False)
+    box.toggled.connect(inner.setVisible)
+    outer.addWidget(inner)
+    parent_layout.addWidget(box)
+    return QVBoxLayout(inner)
+
+
+def readable(command):
+    """« laminar/B738/autopilot/lvl_chg_press » → « LVL CHG »."""
+    name = command.rsplit("/", 1)[-1]
+    for suffix in ("_press", "_toggle"):
+        if name.endswith(suffix):
+            name = name[:-len(suffix)]
+    return name.replace("_", " ").upper()
+
+
 class DmeWidget(QWidget):
     """Réplique de l'écran du DME, boutons virtuels et données simulées (en attendant X-Plane)."""
 
@@ -125,9 +148,10 @@ class DmeWidget(QWidget):
             b.clicked.connect(fn)
             row.addWidget(b)
         row.addStretch()
-        lay.addLayout(row)
+        virtual_section(lay).addLayout(row)
 
         sim = QGroupBox("Simulateur (en attendant X-Plane)")
+        self.sim_group = sim                         # grisé quand X-Plane est connecté
         g = QGridLayout(sim)
         self.signal = QCheckBox("signal DME reçu")
         self.signal.setChecked(True)
@@ -204,13 +228,13 @@ class AutopilotWidget(QWidget):
             self.lamps[name] = lab
         lay.addWidget(QLabel("Voyants du MCP"))
         lay.addLayout(grid)
-        lay.addWidget(QLabel("Boutons virtuels (même effet qu'un appui sur le MCP)"))
         bgrid = QGridLayout()
         for k, name in enumerate(ctrl.buttons):
             b = QPushButton(name)
+            b.setMinimumHeight(30)
             b.clicked.connect(lambda _=False, n=name: ctrl.press(n))
             bgrid.addWidget(b, k // 8, k % 8)
-        lay.addLayout(bgrid)
+        virtual_section(lay).addLayout(bgrid)
         self.show_value(None)
 
     def show_value(self, _value):
@@ -225,36 +249,60 @@ class AutopilotWidget(QWidget):
 
 
 class RadioWidget(QWidget):
-    """Boîtier radio : source choisie, fréquences ACTIVE / STANDBY, boutons virtuels."""
+    """Façade de la radio : afficheurs ACTIVE / STANDBY, source choisie, voyants."""
 
     def __init__(self, ctrl):
         super().__init__()
+        from ..hw import radio_airbus
         self.ctrl = ctrl
         lay = QVBoxLayout(self)
         title = QLabel(f"<b>{ctrl.name}</b> <span style='color:#888'>— {ctrl.describe()}</span>")
         title.setWordWrap(True)
         lay.addWidget(title)
-        self.lcd = QLabel()
-        self.lcd.setStyleSheet(LCD.replace("56px", "30px"))
-        lay.addWidget(self.lcd)
+        face = QGridLayout()
+        self.source = QLabel()
+        self.source.setStyleSheet("font-size:20px; font-weight:bold;")
+        face.addWidget(self.source, 0, 0, 1, 2)
+        self.lcds = {}
+        for col, name in enumerate(("ACTIVE", "STANDBY")):
+            face.addWidget(QLabel(f"<b>{name}</b>"), 1, col)
+            lcd = QLabel()
+            lcd.setStyleSheet(LCD.replace("56px", "40px"))
+            lcd.setAlignment(Qt.AlignCenter)
+            lcd.setMinimumHeight(72)
+            face.addWidget(lcd, 2, col)
+            self.lcds[name] = lcd
+        lay.addLayout(face)
+        lamps = QHBoxLayout()
+        self.lamps = {}
+        for name in radio_airbus.LEDS:
+            lab = QLabel(name)
+            lab.setAlignment(Qt.AlignCenter)
+            lab.setMinimumHeight(32)
+            lamps.addWidget(lab)
+            self.lamps[name] = lab
+        lay.addLayout(lamps)
         row = QHBoxLayout()
-        for s in ctrl.sources:
-            b = QPushButton(s.name)
-            b.clicked.connect(lambda _=False, n=s.name: ctrl.select(n))
+        for src in ctrl.sources:
+            b = QPushButton(src.name)
+            b.setMinimumHeight(30)
+            b.clicked.connect(lambda _=False, n=src.name: ctrl.select(n))
             row.addWidget(b)
         b = QPushButton("⇄ transfert")
+        b.setMinimumHeight(30)
         b.clicked.connect(ctrl.swap)
         row.addWidget(b)
         row.addStretch()
-        lay.addLayout(row)
+        virtual_section(lay).addLayout(row)
         self.show_value(None)
 
     def show_value(self, _value):
-        if not self.ctrl.powered:
-            self.lcd.setText("radio éteinte")
-            return
-        texts, _ = self.ctrl.radio_display()
-        self.lcd.setText(f"{self.ctrl.selected.name}   {texts['ACTIVE']}  ⇄  {texts['STANDBY']}")
+        texts, leds = self.ctrl.radio_display()
+        self.source.setText(self.ctrl.selected.name if self.ctrl.powered else "radio éteinte")
+        for name, lcd in self.lcds.items():
+            lcd.setText(texts.get(name, "") or " ")
+        for name, lab in self.lamps.items():
+            lab.setStyleSheet(POS_ON if leds.get(name) else POS_OFF)
 
 
 def _titled(widget, ctrl):
@@ -276,11 +324,12 @@ class KeypadWidget(QWidget):
         self.last.setStyleSheet(LCD.replace("56px", "24px"))
         self.last.setMinimumHeight(52)
         lay.addWidget(self.last)
+        keys_lay = virtual_section(lay)
         for title, names in usbfmc.LAYOUT.items():
             names = [n for n in names if n in ctrl.keys]
             if not names or (title.startswith("Lignes") and not show_lsk):
                 continue
-            lay.addWidget(QLabel(f"<i>{title}</i>"))
+            keys_lay.addWidget(QLabel(f"<i>{title}</i>"))
             grid = QGridLayout()
             grid.setSpacing(3)
             per_row = 6 if title.startswith("Lignes") else 15
@@ -290,7 +339,7 @@ class KeypadWidget(QWidget):
                 b.setToolTip(ctrl.keys[name])
                 b.clicked.connect(lambda _=False, n=name: ctrl.press(n))
                 grid.addWidget(b, k // per_row, k % per_row)
-            lay.addLayout(grid)
+            keys_lay.addLayout(grid)
 
     def show_value(self, value):
         if value:
@@ -404,17 +453,17 @@ class CommandsWidget(QWidget):
         lay.addWidget(self.last)
         grid = QGridLayout()
         for k, (index, cmd) in enumerate(ctrl.commands.items()):
-            b = QPushButton(cmd.rsplit("/", 1)[-1])
+            b = QPushButton(readable(cmd))
             b.setMinimumHeight(30)
             b.setToolTip(f"entrée {index} : {cmd}")
             b.clicked.connect(lambda _=False, i=index: ctrl.press(i))
             grid.addWidget(b, k // 7, k % 7)
-        lay.addLayout(grid)
+        virtual_section(lay).addLayout(grid)
         lay.addStretch()
 
     def show_value(self, value):
         if value:
-            self.last.setText(f"dernier appui : {value}")
+            self.last.setText(f"dernier appui : {readable(str(value).split(' (')[0])}")
 
 
 class ControlWidget(QWidget):
@@ -471,7 +520,7 @@ class ControlWidget(QWidget):
             for name, lab in self.pos.items():
                 lab.setStyleSheet(POS_ON if name == value else POS_OFF)
         elif isinstance(self.ctrl, Switch):
-            self.ind.setText("ACTIONNÉ" if value else "repos")
+            self.ind.setText("ON" if value else "OFF")
             self.ind.setStyleSheet(POS_ON if value else POS_OFF)
 
 
@@ -586,8 +635,9 @@ class PanelWindow(QMainWindow):
                  for cid, st in status.items()]
         if self.engine.cockpit.sim:
             ok = self.engine.sim_connected
+            plane = self.engine.aircraft
             parts.append("<b>X-Plane</b> : " + (
-                "<span style='color:#4c4'>connecté</span>" if ok else
+                f"<span style='color:#4c4'>connecté{' — avion ' + plane if plane else ''}</span>" if ok else
                 "<span style='color:#e55'>en attente (lancez X-Plane)</span>"))
         self.cards_label.setText(" &nbsp; ".join(parts))
 
@@ -599,6 +649,9 @@ class PanelWindow(QMainWindow):
         if self.engine.sim_connected != was:
             self._log("X-Plane " + ("connecté" if self.engine.sim_connected else "perdu"))
             self._show_status()
+            for w in self.widgets.values():           # données simulées inutiles avec X-Plane
+                if hasattr(w, "sim_group"):
+                    w.sim_group.setEnabled(not self.engine.sim_connected)
         for ch in changes:
             w = self.widgets.get((ch.instrument, ch.control))
             alert = getattr(getattr(w, "ctrl", None), "alert", None)

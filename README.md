@@ -57,9 +57,11 @@ sudo udevadm control --reload && sudo udevadm trigger
 bin/simcockpit-gui
 ```
 
-Un onglet par carte détectée :
-- une grille de toutes les entrées : une case s'allume quand on actionne la commande
-  correspondante, et le numéro de la dernière entrée actionnée s'affiche en grand ;
+Le banc de test ne connaît ni la logique ni X-Plane : il montre les cartes telles
+qu'elles sont. Un onglet par carte détectée :
+- une grille de toutes les entrées : une case s'allume quand l'entrée s'écarte de son
+  état de repos (mémorisé au démarrage, quelle que soit la polarité), et le numéro de la
+  dernière entrée actionnée s'affiche en grand ;
 - les axes analogiques ;
 - les sorties. Leur écriture est verrouillée tant que la case « Autoriser l'écriture »
   n'est pas cochée.
@@ -82,7 +84,8 @@ bin/cockpit-panel config/avions/b738-laminar     # Boeing 737-800 de Laminar (X-
 
 Le panneau connecte les cartes déclarées dans la configuration, applique la logique de
 chaque instrument (un onglet par instrument), puis met à jour les afficheurs et les
-voyants du matériel. Après une modification du fichier YAML, cliquez sur « Recharger la
+voyants du matériel. Il montre l'état du cockpit (afficheurs, voyants, écran du CDU…) ;
+les boutons qui remplacent le matériel sont rangés dans « Commandes virtuelles ». Après une modification du fichier YAML, cliquez sur « Recharger la
 configuration ».
 
 > Les afficheurs du MCP ne restent allumés **que tant qu'un programme lit la carte**.

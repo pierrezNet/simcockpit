@@ -58,6 +58,7 @@ class CardView(QWidget):
         self.card = Card(detected.info, detected.type, debounce=0.03,
                          raw_events=not detected.known)
         self.state = [None] * mastercard.INPUTS
+        self.rest = None          # état de repos mémorisé : « actionnée » = différente du repos
         self.changed_at = [0.0] * mastercard.INPUTS
         self.counts = [0] * mastercard.INPUTS
         self.out_bits = {}  # segment -> octet
@@ -82,7 +83,7 @@ class CardView(QWidget):
         root.addLayout(top, 1)
 
         # --- entrées
-        box = QGroupBox("Entrées (numéros SIOC) — vert = actionnée, orange = vient de changer")
+        box = QGroupBox("Entrées (numéros SIOC) — vert = écartée du repos, orange = vient de changer")
         grid = QGridLayout(box)
         grid.setSpacing(4)
         self.cells = []
@@ -99,6 +100,12 @@ class CardView(QWidget):
                 cell.setToolTip(f"Entrée {i} ({row_name} {row}, bit {b})")
                 grid.addWidget(cell, row, b + 1)
                 self.cells.append(cell)
+        if n_inputs:
+            rest_btn = QPushButton("Mémoriser le repos")
+            rest_btn.setToolTip("Prend l'état actuel comme état de repos : une entrée passe au vert"
+                                " quand elle s'en écarte, quelle que soit sa polarité.")
+            rest_btn.clicked.connect(self._memorize_rest)
+            grid.addWidget(rest_btn, 9, 0, 1, 4)
         if detected.type.protocol == "dme":
             box.setTitle("Boutons : entrée 0 = SEL, entrée 1 = PWR")
         if detected.type.protocol == "keys":
@@ -425,8 +432,7 @@ class CardView(QWidget):
         for text, fn in (("Effacer l'écran", self._dme_clear),
                          ("Éteindre le DME", lambda: self._dme_cmd(dme.OFF, "DME éteint")),
                          ("Allumer (test des segments)",
-                          lambda: self._dme_cmd(dme.ON, "DME allumé")),
-                         ("Exemple : 3.2 NM LIL", self._dme_demo)):
+                          lambda: self._dme_cmd(dme.ON, "DME allumé"))):
             b = QPushButton(text)
             b.clicked.connect(fn)
             row.addWidget(b)
@@ -477,14 +483,6 @@ class CardView(QWidget):
             for buttons in self.dme_groups.values():
                 for b in buttons:
                     b.setChecked(False)
-
-    def _dme_demo(self):
-        self.dme_dist.setText("3.2")
-        self.dme_right.setText("LIL")
-        self._dme_clear()
-        self._send_dme_texts()
-        for group, label in (("canal", "1"), ("unite_gauche", "NM"), ("unite_droite", "ID")):
-            self._set_dme_annunciator(group, label)
 
     def _build_passive(self):
         """Carte d'un fabricant connu mais modèle non pris en charge : trames brutes seulement."""
@@ -569,16 +567,12 @@ class CardView(QWidget):
             return
         if ev.kind == "ready":
             self.state = list(ev.value)
-            for i in range(len(self.cells)):
-                self._paint(i)
-            act = [i for i, v in enumerate(self.state) if self.card.is_active(v)]
-            self.status.setText(f"{self.card.name} — {self.detected.info.path} — prête."
-                                f" Actionnées au repos : {act or 'aucune'}")
+            self._memorize_rest()
         elif ev.kind == "input":
             self.activity.emit()
             self.state[ev.index] = ev.value
             self.changed_at[ev.index] = ev.t
-            active = self.card.is_active(ev.value)
+            active = self._is_actuated(ev.index)
             if active:
                 self.counts[ev.index] += 1
             self._paint(ev.index)
@@ -592,12 +586,27 @@ class CardView(QWidget):
             self.status.setText(f"Carte perdue ({ev.value}). Rebranchez puis « Rechercher ».")
             self._log(f"ERREUR : {ev.value}")
 
-    def _paint(self, i):
+    def _memorize_rest(self):
+        """L'état actuel devient l'état de repos (au démarrage, puis à la demande)."""
+        self.rest = list(self.state)
+        for i in range(len(self.cells)):
+            self._paint(i)
+        high = [i for i in range(len(self.cells)) if self.rest[i]]
+        self.status.setText(f"{self.card.name} — {self.detected.info.path} — prête. Repos mémorisé ;"
+                            f" entrées à 1 au repos : {high or 'aucune'}")
+
+    def _is_actuated(self, i):
         v = self.state[i]
-        bg = ACTIVE if (v is not None and self.card.is_active(v)) else REST
+        if v is None or self.rest is None:
+            return False
+        return v != self.rest[i]
+
+    def _paint(self, i):
+        bg = ACTIVE if self._is_actuated(i) else REST
         self.cells[i].set_colors(bg, RECENT if self.changed_at[i] else None)
-        n = self.counts[i]
-        self.cells[i].setToolTip(f"Entrée {i} — actionnée {n} fois")
+        rest = "?" if self.rest is None else self.rest[i]
+        self.cells[i].setToolTip(f"Entrée {i} — valeur {self.state[i]}, repos {rest} —"
+                                 f" actionnée {self.counts[i]} fois")
 
     def _log(self, text):
         self.log.insertItem(0, text)

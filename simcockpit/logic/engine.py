@@ -168,6 +168,16 @@ class Engine:
             self.sim = XPlane(self.cockpit.sim["host"], self.cockpit.sim["port"])
             for ref in self._sim_listeners:
                 self.sim.subscribe(ref)
+            for i in range(8):                       # code OACI de l'avion chargé
+                self.sim.subscribe(f"sim/aircraft/view/acf_ICAO[{i}]")
+
+    @property
+    def aircraft(self):
+        """Code OACI de l'avion chargé dans X-Plane (« B738 »), ou chaîne vide."""
+        if self.sim is None:
+            return ""
+        codes = [int(self.sim.values.get(f"sim/aircraft/view/acf_ICAO[{i}]", 0)) for i in range(8)]
+        return "".join(chr(c) for c in codes if 32 < c < 127)
 
     # ------------------------------------------------------------ matériel
     def connect(self):
