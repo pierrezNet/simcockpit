@@ -61,3 +61,18 @@ def led_frame(lit=()) -> bytes:
     for name in lit:
         mask |= 1 << LEDS[name]
     return bytes([mask]) + bytes(7)
+
+
+class FmcOutputs:
+    """État des 5 voyants du CDU ; même interface que les sorties du MCP pour le moteur."""
+
+    def __init__(self):
+        self.lit = set()
+
+    def set_led(self, name, on):
+        if name not in LEDS:
+            raise KeyError(name)
+        (self.lit.add if on else self.lit.discard)(name)
+
+    def led_frame(self) -> bytes:
+        return led_frame(self.lit)

@@ -81,3 +81,47 @@ class SimLeds(Control):
 
     def describe(self):
         return f"{len(self.leds)} voyants ← datarefs X-Plane"
+
+
+class Keypad(Control):
+    """Clavier (CDU) : chaque touche, désignée par son nom, déclenche une commande X-Plane.
+
+    Les touches arrivent comme des événements « key » (une trame par appui, rien au
+    relâchement) ; les noms sont ceux de simcockpit/hw/usbfmc.py (EXEC, LSK1L, A, 1…).
+    """
+    type = "keypad"
+
+    def __init__(self, name, keys, **kw):
+        from ..hw import usbfmc
+        known = set(usbfmc.KEYS.values())
+        unknown = sorted(set(map(str, keys)) - known)
+        if unknown:
+            raise ValueError(f"{name} : touches inconnues {unknown}")
+        self.keys = {str(k): c for k, c in dict(keys).items()}
+        self._code_to_name = usbfmc.KEYS
+        super().__init__(name, [], **kw)
+        self._pressed = None
+
+    def update(self, active, t):
+        pass
+
+    def on_key(self, code, t):
+        self.press(self._code_to_name.get(code))
+
+    def press(self, key):
+        """Appui sur une touche (matériel ou panneau virtuel)."""
+        cmd = self.keys.get(key)
+        if cmd is None:
+            return
+        if self.sim_connected:
+            self._sim("cmd", cmd)
+        self._pressed = key
+
+    def poll(self, t):
+        if self._pressed is None:
+            return None
+        key, self._pressed = self._pressed, None
+        return key + ("" if self.sim_connected else " (X-Plane absent)")
+
+    def describe(self):
+        return f"{len(self.keys)} touches → commandes X-Plane"

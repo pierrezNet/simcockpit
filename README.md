@@ -114,10 +114,13 @@ bin/simcockpit send --port 1-14 "…"       # envoyer une trame brute (essais)
 ### Avec X-Plane 12
 
 ```sh
-bin/cockpit-panel config/avions/b738-laminar     # MCP et radio reliés au Boeing 737-800 de Laminar
+bin/cockpit-panel config/avions/b738-laminar     # MCP, radio et CDU reliés au Boeing 737-800 de Laminar
 ```
 
-Lancez X-Plane (le port UDP 49000 est ouvert par défaut) et chargez l'avion. Le panneau
+Lancez X-Plane (le port UDP 49000 est ouvert par défaut) et chargez l'avion. X-Plane ne
+sert que 500 abonnements par client et perd une partie d'une grosse rafale de demandes :
+le connecteur répartit donc ses abonnements sur plusieurs ports locaux et relance ceux
+qui restent sans réponse (l'écran du CDU en demande à lui seul 1536). Le panneau
 affiche « X-Plane : connecté » dès que le simulateur répond, et se reconnecte seul s'il
 redémarre. À la connexion, la position des interrupteurs du MCP est envoyée à l'avion.
 
@@ -132,6 +135,7 @@ config/
     │   ├── mcp.yaml
     │   └── transpondeur.yaml
     └── b738-laminar/       # Boeing 737-800 de Laminar (X-Plane 12)
+        ├── cdu.yaml        # CDU → FMS du commandant (sim/FMS/…)
         ├── mcp.yaml
         ├── radio.yaml      # COM1, COM2, NAV1, NAV2
         └── sim.yaml        # liaison X-Plane
@@ -178,8 +182,10 @@ instruments:
 | `speed_encoder` | vitesse avec bascule IAS / Mach (bouton C/O) | `toggle_input`, `toggle_level`, `ias`, `mach`, `altitude_from` |
 | `dme_indicator` | indicateur DME Collins IND-42C sur le DME EFDE | `channel`, `self_test`, `backlight` |
 | `radio_panel` | boîtier radio (radio Airbus) : sources COM/NAV/ADF, bagues, transfert, afficheurs | `sources`, `outer`, `inner`, `transfer`, `power`, `power_on`, `button_level` |
+| `cdu_screen` | écran du CDU lu dans X-Plane (16 × 24 caractères, couleurs), affiché dans le panneau | `side` (1 commandant, 2 copilote) |
+| `keypad` | clavier (CDU) : chaque touche, désignée par son nom, déclenche une commande X-Plane | `keys` |
 | `commands` | poussoirs → commandes X-Plane (`inputs: {entrée: commande}`) | `inputs`, `level` |
-| `sim_leds` | voyants du MCP qui suivent des datarefs X-Plane | `leds` |
+| `sim_leds` | voyants (MCP, CDU) qui suivent des datarefs X-Plane | `leds` |
 | `rj_autopilot` | modes du pilote automatique de l'Avro RJ sur le MCP (voyants compris) | `buttons`, `fd_left`, `fd_right`, `at_arm`, `disengage` |
 
 Options communes à tous les types : `display` (afficheur), `led` (voyant), et pour

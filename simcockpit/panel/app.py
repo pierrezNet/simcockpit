@@ -10,13 +10,17 @@ from PySide6.QtCore import QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (QApplication, QCheckBox, QDoubleSpinBox, QGridLayout, QGroupBox,
                                QHBoxLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
-                               QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
+                               QPushButton, QScrollArea, QSpinBox, QTabWidget, QVBoxLayout,
+                               QWidget)
 
 from ..logic import config
 from ..hw import dme as dme_hw
 from ..logic.controls import Encoder, OctalDigits, Selector, SpeedEncoder, Switch
 from ..logic.dme_indicator import DmeIndicator
+from ..hw import usbfmc
 from ..logic.radio_panel import RadioPanel
+from ..logic.sim_controls import Commands, Keypad, SimLeds
+from ..logic.cdu_screen import CduScreen
 from ..logic.rj_autopilot import RjAutopilot
 from ..gui.qtenv import prepare
 from ..logic.engine import Engine
@@ -253,6 +257,166 @@ class RadioWidget(QWidget):
         self.lcd.setText(f"{self.ctrl.selected.name}   {texts['ACTIVE']}  ⇄  {texts['STANDBY']}")
 
 
+def _titled(widget, ctrl):
+    lay = QVBoxLayout(widget)
+    title = QLabel(f"<b>{ctrl.name}</b> <span style='color:#888'>— {ctrl.describe()}</span>")
+    title.setWordWrap(True)
+    lay.addWidget(title)
+    return lay
+
+
+class KeypadWidget(QWidget):
+    """Clavier (CDU) : dernière touche appuyée et clavier virtuel cliquable."""
+
+    def __init__(self, ctrl, show_lsk=True):
+        super().__init__()
+        self.ctrl = ctrl
+        lay = _titled(self, ctrl)
+        self.last = QLabel("Appuyez sur une touche du CDU…")
+        self.last.setStyleSheet(LCD.replace("56px", "24px"))
+        self.last.setMinimumHeight(52)
+        lay.addWidget(self.last)
+        for title, names in usbfmc.LAYOUT.items():
+            names = [n for n in names if n in ctrl.keys]
+            if not names or (title.startswith("Lignes") and not show_lsk):
+                continue
+            lay.addWidget(QLabel(f"<i>{title}</i>"))
+            grid = QGridLayout()
+            grid.setSpacing(3)
+            per_row = 6 if title.startswith("Lignes") else 15
+            for k, name in enumerate(names):
+                b = QPushButton(name)
+                b.setMinimumHeight(30)
+                b.setToolTip(ctrl.keys[name])
+                b.clicked.connect(lambda _=False, n=name: ctrl.press(n))
+                grid.addWidget(b, k // per_row, k % per_row)
+            lay.addLayout(grid)
+
+    def show_value(self, value):
+        if value:
+            key = str(value).split(" (")[0]
+            self.last.setText(f"{value}  →  {self.ctrl.keys.get(key, '')}")
+
+
+class CduScreenWidget(QWidget):
+    """Écran du CDU dessiné comme dans l'avion : 16 × 24 caractères, couleurs, deux tailles."""
+    COLORS = {0: "#000000", 1: "#3ad6f0", 2: "#ff4040", 3: "#ffe14d", 4: "#36e05a",
+              5: "#ff5ce6", 6: "#ffb000", 7: "#f2f2f2"}
+
+    LINE = 30            # hauteur d'une ligne de l'écran (px)
+    WIDTH = 24 * 26      # 24 colonnes
+
+    def __init__(self, ctrl, keypad=None):
+        """Avec `keypad`, les 12 touches LSK sont placées de part et d'autre de l'écran,
+        alignées sur les lignes de données (lignes 2, 4 … 12)."""
+        super().__init__()
+        self.ctrl = ctrl
+        grid = QGridLayout(self)
+        grid.setVerticalSpacing(0)
+        grid.setHorizontalSpacing(10)
+        self.screen = _CduCanvas(ctrl, self.COLORS)
+        self.screen.setFixedSize(self.WIDTH + 20, 16 * self.LINE)
+        grid.addWidget(self.screen, 0, 1, 16, 1)
+        for row in range(16):
+            grid.setRowMinimumHeight(row, self.LINE)
+        if keypad is not None:
+            for n in range(1, 7):
+                for side, col in (("L", 0), ("R", 2)):
+                    name = f"LSK{n}{side}"
+                    if name not in keypad.keys:
+                        continue
+                    b = QPushButton("—")
+                    b.setFixedSize(64, self.LINE - 2)
+                    b.setToolTip(f"{name} : {keypad.keys[name]}")
+                    b.clicked.connect(lambda _=False, k=name: keypad.press(k))
+                    grid.addWidget(b, 2 * n, col)
+        grid.setColumnStretch(3, 1)
+
+    def show_value(self, _value):
+        self.screen.update()
+
+
+class _CduCanvas(QWidget):
+    def __init__(self, ctrl, colors):
+        super().__init__()
+        self.ctrl, self.COLORS = ctrl, colors
+
+    def paintEvent(self, _ev):
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor("#050505"))
+        cw = (self.width() - 20) / 24
+        lh = self.height() / 16
+        big = QFont("monospace", 1, QFont.Bold)
+        big.setPixelSize(int(lh * 0.85))
+        small = QFont("monospace", 1)
+        small.setPixelSize(int(lh * 0.62))
+        for row, (text, styles) in enumerate(self.ctrl.lines()):
+            y = row * lh
+            for col, ch in enumerate(text):
+                st = styles[col] if col < len(styles) else 0
+                color = QColor(self.COLORS.get(st & 0x07, "#f2f2f2"))
+                rect = QRectF(10 + col * cw, y, cw, lh)
+                if st & 0x40:                          # vidéo inverse
+                    p.fillRect(rect, color)
+                    color = QColor("#050505")
+                if ch == " ":
+                    continue
+                p.setFont(big if st & 0x80 else small)
+                p.setPen(color)
+                p.drawText(rect, Qt.AlignCenter, ch)
+        p.end()
+
+
+class SimLedsWidget(QWidget):
+    """Voyants qui suivent des datarefs X-Plane."""
+
+    def __init__(self, ctrl):
+        super().__init__()
+        self.ctrl = ctrl
+        lay = _titled(self, ctrl)
+        grid = QGridLayout()
+        self.lamps = {}
+        for k, name in enumerate(ctrl.leds):
+            lab = QLabel(name)
+            lab.setAlignment(Qt.AlignCenter)
+            lab.setMinimumHeight(32)
+            lab.setToolTip(ctrl.leds[name])
+            grid.addWidget(lab, k // 8, k % 8)
+            self.lamps[name] = lab
+        lay.addLayout(grid)
+        lay.addStretch()
+        self.show_value(None)
+
+    def show_value(self, _value):
+        for name, on in self.ctrl.led_states().items():
+            self.lamps[name].setStyleSheet(POS_ON if on else POS_OFF)
+
+
+class CommandsWidget(QWidget):
+    """Poussoirs reliés à des commandes : dernier appui et boutons virtuels."""
+
+    def __init__(self, ctrl):
+        super().__init__()
+        self.ctrl = ctrl
+        lay = _titled(self, ctrl)
+        self.last = QLabel("—")
+        self.last.setStyleSheet("font-size:18px; font-weight:bold; padding:4px;")
+        lay.addWidget(self.last)
+        grid = QGridLayout()
+        for k, (index, cmd) in enumerate(ctrl.commands.items()):
+            b = QPushButton(cmd.rsplit("/", 1)[-1])
+            b.setMinimumHeight(30)
+            b.setToolTip(f"entrée {index} : {cmd}")
+            b.clicked.connect(lambda _=False, i=index: ctrl.press(i))
+            grid.addWidget(b, k // 7, k % 7)
+        lay.addLayout(grid)
+        lay.addStretch()
+
+    def show_value(self, value):
+        if value:
+            self.last.setText(f"dernier appui : {value}")
+
+
 class ControlWidget(QWidget):
     """Affichage d'une commande selon son type."""
 
@@ -367,6 +531,11 @@ class PanelWindow(QMainWindow):
         self.engine = Engine(cockpit)
         for inst in cockpit.instruments.values():
             page = QWidget()
+            scroll = QScrollArea()                 # défilement si la fenêtre est trop petite
+            scroll.setWidgetResizable(True)
+            scroll.setWidget(page)
+            keypad = next((c for c in inst.controls.values() if isinstance(c, Keypad)), None)
+            has_screen = any(isinstance(c, CduScreen) for c in inst.controls.values())
             outer = QVBoxLayout(page)
             outer.addWidget(QLabel(f"<i>carte « {inst.card} » ({cockpit.cards[inst.card].product})</i>"))
             lay = QGridLayout()
@@ -377,15 +546,24 @@ class PanelWindow(QMainWindow):
                 elif isinstance(ctrl, RadioPanel):
                     w = RadioWidget(ctrl)
                     lay.addWidget(w, k // 3, 0, 1, 3)
+                elif isinstance(ctrl, CduScreen):          # façade : LSK de part et d'autre
+                    w = CduScreenWidget(ctrl, keypad)
+                    lay.addWidget(w, 40, 0, 1, 3, Qt.AlignHCenter)
+                elif isinstance(ctrl, Keypad):
+                    w = KeypadWidget(ctrl, show_lsk=not has_screen)
+                    lay.addWidget(w, 50 + k, 0, 1, 3)
+                elif isinstance(ctrl, (SimLeds, Commands)):  # sur toute la largeur
+                    w = {SimLeds: SimLedsWidget, Commands: CommandsWidget}[type(ctrl)](ctrl)
+                    lay.addWidget(w, 50 + k, 0, 1, 3)
                 else:
                     w = DmeWidget(ctrl) if isinstance(ctrl, DmeIndicator) else ControlWidget(ctrl)
                     lay.addWidget(w, k // 3, k % 3)
                 self.widgets[(inst.id, name)] = w
             outer.addLayout(lay)
             outer.addStretch()
-            self.tabs.addTab(page, inst.label)
+            self.tabs.addTab(scroll, inst.label)
             if inst.label == previous_tab:
-                self.tabs.setCurrentWidget(page)
+                self.tabs.setCurrentWidget(scroll)
         self._log("configuration chargée : " + ", ".join(cockpit.instruments))
         self._connect()
         self.tick.start()

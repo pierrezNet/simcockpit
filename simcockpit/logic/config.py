@@ -15,7 +15,7 @@ import yaml
 
 MATERIEL = "materiel.yaml"
 
-from ..hw import mcp
+from ..hw import mcp, usbfmc
 from ..hw.cards import KNOWN, classify
 from . import controls
 
@@ -132,8 +132,15 @@ def parse(data):
                                   + (f" (connus : {', '.join(mcp.DISPLAYS)})" if out == "mcp" else ""))
             if hasattr(ctrl, "radio_display") and out != "radio_airbus":
                 raise ConfigError(f"{iid}.{name} : {ctrl.type} demande une radio OpenCockpits Airbus")
-            if hasattr(ctrl, "led_states") and out != "mcp":
-                raise ConfigError(f"{iid}.{name} : {ctrl.type} demande une carte MCP")
+            if hasattr(ctrl, "led_states"):
+                names = {"mcp": mcp.LEDS, "usbfmc": usbfmc.LEDS}.get(out)
+                if names is None:
+                    raise ConfigError(f"{iid}.{name} : {ctrl.type} demande une carte à voyants (MCP, CDU)")
+                bad = sorted(set(ctrl.led_states()) - set(names))
+                if bad:
+                    raise ConfigError(f"{iid}.{name} : voyants inconnus {bad} (connus : {', '.join(names)})")
+            if hasattr(ctrl, "on_key") and out != "usbfmc":
+                raise ConfigError(f"{iid}.{name} : {ctrl.type} demande un clavier (CDU)")
             if ctrl.led is not None and (out != "mcp" or ctrl.led not in mcp.LEDS):
                 raise ConfigError(f"{iid}.{name} : voyant {ctrl.led!r} inconnu sur cette carte"
                                   + (f" (connus : {', '.join(mcp.LEDS)})" if out == "mcp" else ""))

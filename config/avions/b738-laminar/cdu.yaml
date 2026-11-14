@@ -1,0 +1,91 @@
+# CDU OpenCockpits (737) relié au FMS du commandant (commandes sim/FMS/…), celui
+# qu'utilise le Boeing 737-800 de Laminar ; vaut aussi pour les autres avions au FMS
+# standard d'X-Plane. Le CDU du copilote utiliserait sim/FMS2/….
+# Noms vérifiés dans Commands.txt, DataRefs.txt et le cockpit du 737 (infobulles).
+# Le 737 de Laminar n'a ni MENU ni N1 LIMIT mais DIR INTC et NAV RAD : provisoirement,
+# MENU → DIR INTC et N1 LIMIT → NAV RAD. Seul le voyant EXEC existe dans cet avion.
+
+instruments:
+  cdu:
+    label: CDU (FMS)
+    card: cdu
+    controls:
+      ecran:
+        type: cdu_screen        # écran du CDU lu dans X-Plane (pour le panneau virtuel)
+        side: 1                 # 1 = commandant (sim/FMS/…), 2 = copilote
+      touches:
+        type: keypad
+        keys:
+          LSK1L: sim/FMS/ls_1l
+          LSK2L: sim/FMS/ls_2l
+          LSK3L: sim/FMS/ls_3l
+          LSK4L: sim/FMS/ls_4l
+          LSK5L: sim/FMS/ls_5l
+          LSK6L: sim/FMS/ls_6l
+          LSK1R: sim/FMS/ls_1r
+          LSK2R: sim/FMS/ls_2r
+          LSK3R: sim/FMS/ls_3r
+          LSK4R: sim/FMS/ls_4r
+          LSK5R: sim/FMS/ls_5r
+          LSK6R: sim/FMS/ls_6r
+          "INIT REF": sim/FMS/index
+          RTE: sim/FMS/fpln
+          CLB: sim/FMS/clb
+          CRZ: sim/FMS/crz
+          DES: sim/FMS/des
+          MENU: sim/FMS/dir_intc
+          LEGS: sim/FMS/legs
+          "DEP ARR": sim/FMS/dep_arr
+          HOLD: sim/FMS/hold
+          PROG: sim/FMS/prog
+          EXEC: sim/FMS/exec
+          "N1 LIMIT": sim/FMS/navrad
+          FIX: sim/FMS/fix
+          "PREV PAGE": sim/FMS/prev
+          "NEXT PAGE": sim/FMS/next
+          "0": sim/FMS/key_0
+          "1": sim/FMS/key_1
+          "2": sim/FMS/key_2
+          "3": sim/FMS/key_3
+          "4": sim/FMS/key_4
+          "5": sim/FMS/key_5
+          "6": sim/FMS/key_6
+          "7": sim/FMS/key_7
+          "8": sim/FMS/key_8
+          "9": sim/FMS/key_9
+          ".": sim/FMS/key_period
+          "+/-": sim/FMS/key_minus
+          "/": sim/FMS/key_slash
+          A: sim/FMS/key_A
+          B: sim/FMS/key_B
+          C: sim/FMS/key_C
+          D: sim/FMS/key_D
+          E: sim/FMS/key_E
+          F: sim/FMS/key_F
+          G: sim/FMS/key_G
+          H: sim/FMS/key_H
+          I: sim/FMS/key_I
+          J: sim/FMS/key_J
+          K: sim/FMS/key_K
+          L: sim/FMS/key_L
+          M: sim/FMS/key_M
+          N: sim/FMS/key_N
+          O: sim/FMS/key_O
+          P: sim/FMS/key_P
+          Q: sim/FMS/key_Q
+          R: sim/FMS/key_R
+          S: sim/FMS/key_S
+          T: sim/FMS/key_T
+          U: sim/FMS/key_U
+          V: sim/FMS/key_V
+          W: sim/FMS/key_W
+          X: sim/FMS/key_X
+          Y: sim/FMS/key_Y
+          Z: sim/FMS/key_Z
+          SP: sim/FMS/key_space
+          DEL: sim/FMS/key_delete
+          CLR: sim/FMS/key_clear
+      voyants:
+        type: sim_leds
+        leds:
+          EXEC: sim/cockpit2/radios/indicators/fms_exec_light_pilot

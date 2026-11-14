@@ -13,7 +13,7 @@ import queue
 import time
 from dataclasses import dataclass
 
-from ..hw import manager, mcp, radio_airbus
+from ..hw import manager, mcp, radio_airbus, usbfmc
 from ..hw.cards import classify
 from ..hw.device import Card
 
@@ -34,7 +34,8 @@ class Engine:
         self.cards = {}            # id -> Card (connectées)
         self.status = {cid: "non trouvée" for cid in cockpit.cards}
         # état des sorties par carte (seul le protocole MCP est géré pour l'instant)
-        makers = {"mcp": mcp.McpOutputs, "radio_airbus": radio_airbus.RadioOutputs}
+        makers = {"mcp": mcp.McpOutputs, "radio_airbus": radio_airbus.RadioOutputs,
+                  "usbfmc": usbfmc.FmcOutputs}
         self.outputs = {cid: makers[classify(spec.product).out_protocol]()
                         for cid, spec in cockpit.cards.items()
                         if classify(spec.product).out_protocol in makers}
@@ -57,6 +58,14 @@ class Engine:
             if inst.card == card_id:
                 for ctrl in inst.controls.values():
                     ctrl.update(active, t)
+
+    def key(self, card_id, code, t):
+        """Touche reçue d'un clavier (testable sans matériel)."""
+        for inst in self.cockpit.instruments.values():
+            if inst.card == card_id:
+                for ctrl in inst.controls.values():
+                    if hasattr(ctrl, "on_key"):
+                        ctrl.on_key(code, t)
 
     def poll(self, t):
         changes = []
@@ -122,6 +131,8 @@ class Engine:
         out = self.outputs.get(card_id)
         if isinstance(out, radio_airbus.RadioOutputs):
             self._pending[card_id].update({"display": out.display_frame(), "leds": out.led_frame()})
+        elif isinstance(out, usbfmc.FmcOutputs):
+            self._pending[card_id]["leds"] = out.led_frame()
         elif out is not None:
             p0, p1 = out.display_frames()
             self._pending[card_id].update({"page0": p0, "page1": p1, "leds": out.led_frame()})
@@ -194,7 +205,9 @@ class Engine:
                     ev = card.events.get_nowait()
                 except queue.Empty:
                     break
-                if ev.kind == "state":
+                if ev.kind == "key":                  # clavier (CDU) : une touche par événement
+                    self.key(cid, ev.index, card.t0 + ev.t)
+                elif ev.kind == "state":
                     # horloge absolue : plusieurs cartes, une seule base de temps
                     self.feed(cid, ev.value, card.t0 + ev.t, card.type.active_level)
                 elif ev.kind == "error":
