@@ -23,6 +23,7 @@ from ..logic.sim_controls import Commands, Keypad, SimLeds
 from ..logic.cdu_screen import CduScreen
 from ..logic.rj_autopilot import RjAutopilot
 from ..gui.qtenv import prepare
+from ..gui.winstate import remember
 from ..logic.engine import Engine
 
 LCD = ("background:#111; color:#ffb000; font-family:monospace; font-size:56px;"
@@ -531,7 +532,7 @@ class PanelWindow(QMainWindow):
         self.engine = None
         self.widgets = {}
         self.setWindowTitle(f"simcockpit — panneau virtuel ({path})")
-        self.resize(1200, 700)   # même taille que simcockpit-gui
+        remember(self, "cockpit_virtuel", (1200, 700))   # position et taille mémorisées
 
         central = QWidget()
         self.root = QVBoxLayout(central)

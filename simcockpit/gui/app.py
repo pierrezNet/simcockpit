@@ -8,13 +8,14 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QHBoxLayout, QLabel, QMa
 from ..hw import manager
 from .card_view import CardView
 from .qtenv import prepare
+from .winstate import remember
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("simcockpit — test des cartes")
-        self.resize(1200, 700)
+        remember(self, "banc_de_test", (1200, 700))   # position et taille mémorisées
         self.views = {}  # usb_port -> CardView
 
         central = QWidget()

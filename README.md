@@ -41,6 +41,13 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
+Sous GNOME Wayland, les fenêtres retiennent leur taille ; pour qu'elles retiennent aussi
+leur position et leur écran, elles passent par XWayland, qui demande ces bibliothèques :
+
+```sh
+sudo apt install libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-xkb1 libxkbcommon-x11-0
+```
+
 Pour accéder aux cartes sans `sudo`, installez la règle udev, puis débranchez et
 rebranchez les cartes. L'utilisateur doit être dans le groupe `plugdev`.
 
