@@ -91,12 +91,24 @@ OC_USBFMC = CardType(
     verified="touches (7 vérifiées, table de l'ancien script SIOC) ; 5 voyants (webcam)",
 )
 
+EFDE_FDBUS = CardType(
+    key="efde_fdbus",
+    label="EFDE FDBUS (jauges)",
+    products=("FDBUS",),
+    protocol="fdbus",          # vérifié : exploration du bus puis paramètres de chaque module
+    active_level=1,
+    inputs=0, outputs=0, axes=0,
+    init=False,                # initialisation propre au bus : hw/fdbus.py
+    out_protocol="fdbus",
+    verified="initialisation ; moteur X27 (IVSI) et carte analogique 12 V (volets), webcam",
+)
+
 UNKNOWN = CardType(
     key="unknown", label="Carte inconnue", products=(), protocol="unknown",
     active_level=1, inputs=0, outputs=0, axes=0, send_init=False,
 )
 
-KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME, OC_USBFMC, OC_RADIO_AIRBUS)
+KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME, OC_USBFMC, OC_RADIO_AIRBUS, EFDE_FDBUS)
 
 
 def classify(product: str) -> CardType:

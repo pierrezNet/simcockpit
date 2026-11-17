@@ -1,0 +1,33 @@
+# Jauges du bus FDBUS (EFDE), écrit par le banc de test (onglet FDBUS).
+# Par adresse de module : type du module, puis pour chaque sortie la jauge qui y est
+# branchée (nom, unité) et l'étalonnage de son cadran : « valeur lue: position du moteur
+# (0-255) ». Un module d'un autre type à la même adresse n'utilise pas ces réglages.
+# Ces réglages restent sur le PC : ils ne sont jamais écrits dans les modules.
+modules:
+  250:
+    type: 49
+    sortie1:
+      nom: Volets
+      unite: °
+      points:
+        0: 10
+        18: 158
+        24: 202
+        33: 255
+  251:
+    type: 2
+    sortie1:
+      nom: Vitesse verticale
+      unite: ft/min
+      points:
+        -5000: 0
+        -4000: 20
+        -3000: 40
+        -2000: 63
+        -1000: 93
+        0: 133
+        1000: 169
+        2000: 197
+        3000: 219
+        4000: 239
+        5000: 255

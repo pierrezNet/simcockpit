@@ -25,6 +25,7 @@ officiel d'OpenCockpits, qui ne fonctionne que sous Windows.
 | EFDE DME (réplique Collins IND-42) | `DME USB` | ✅ boutons SEL et PWR | ✅ distance, texte, 9 voyants, rétroéclairage, marche/arrêt |
 | OpenCockpits radio Airbus | `IOCard-RadioAirb` | ✅ 8 poussoirs, ON/OFF, double rotatif | ✅ 2 afficheurs de 6 chiffres, points décimaux, 8 voyants |
 | OpenCockpits CDU 737 | `USBFMC V1.0` | ✅ 70 touches | ✅ 5 voyants (OFST, MSG, EXEC, DSPY, FAIL) |
+| EFDE FDBUS (bus de jauges) | `FDBUS` | — | ✅ modules moteur X27 et analogique 12 V : position de l'aiguille |
 | OpenCockpits USB Expansion + Master Card | `IOCardUSB` | ✅ 72 entrées (la Master Card doit être alimentée) | ⚠️ codage connu, non testé |
 
 Une carte d'un de ces fabricants dont le modèle est inconnu est quand même détectée.
@@ -81,6 +82,18 @@ Pour le CDU, il affiche toutes les touches et un bouton par voyant.
 Pour la radio Airbus, il propose un champ par afficheur (« 118.700 ») et un bouton par voyant.
 Pour le DME, il propose la distance, le texte de droite, les voyants, le rétroéclairage
 et la mise en marche ou l'arrêt.
+
+Pour le bus de jauges EFDE (FDBUS), l'initialisation se fait seule au branchement, puis
+l'onglet montre une colonne par jauge trouvée :
+- la valeur du cadran dans son unité, un champ pour y placer l'aiguille et un bouton par repère ;
+- l'**étalonnage** du cadran, repère par repère : on amène l'aiguille sur un repère au
+  curseur, on saisit sa valeur, on enregistre. Un repère qui casse le sens de la courbe
+  apparaît en rouge ;
+- le **nom et l'unité** de la jauge branchée sur la sortie (rien n'est figé dans le code) ;
+- les paramètres du module, sa remise à zéro et le **changement d'adresse** (strap de
+  configuration en place ; c'est la seule écriture en EEPROM que fait simcockpit).
+
+Nom, unité et étalonnage sont gardés dans `config/fdbus.yaml`, jamais dans les modules.
 
 ### Panneau virtuel (logique du cockpit)
 
@@ -139,6 +152,7 @@ redémarre. À la connexion, la position des interrupteurs du MCP est envoyée �
 ```
 config/
 ├── materiel.yaml           # cartes physiques, décrites une seule fois
+├── fdbus.yaml              # jauges FDBUS : nom, unité, étalonnage (écrit par la fenêtre de test)
 └── avions/
     ├── rj85-simule/        # Avro RJ85, logique simulée (sans X-Plane)
     │   ├── dme.yaml
@@ -320,6 +334,24 @@ est dans `simcockpit/hw/usbfmc.py`.
 Le détail et les cas vérifiés se trouvent dans `simcockpit/hw/` et dans les tests, qui
 rejouent des captures réelles (`tests/data/`).
 
+**Bus de jauges EFDE (FDBUS)** (structure communiquée par EFDE, séquence vérifiée à la
+webcam). Trames de 8 octets, octet 0 = fonction ; les modules sont aux adresses 195 à 254.
+Aucune commande de position n'est prise en compte sans l'initialisation complète :
+
+1. `00 00 00 …` : la carte explore le bus. Réponses : `03 adr` (adresse vide), `01 adr type`
+   (module trouvé), `ff` (fin).
+2. Pour chaque module n° i : `07 adr 00` puis `ff adr i`. Le module renvoie ses paramètres,
+   un par trame `[fonction 150 à 187, i, valeur]` (Mini, Maxi, offset, plage FS…).
+3. `fe 00 00` : la carte répond `fe`, l'initialisation est terminée.
+
+Ensuite, `03 adr pos` place l'aiguille de la sortie 1 (0 à 255, borné par Mini et Maxi du
+module) ; la première après l'initialisation est ignorée, simcockpit l'envoie deux fois.
+`07 adr 00` ramène le moteur X27 en butée. Les fonctions 50 à 88 écrivent l'EEPROM du
+module : simcockpit n'envoie que la 50 (changement d'adresse, `32 adr nouvelle`), sur
+demande. Deux modules à la même adresse se répondent l'un sur l'autre : renuméroter l'un
+d'eux, puis couper l'alimentation du bus. Sans le 5 V du bus, le module X27 s'annonce en
+type 0.
+
 ## Tests
 
 ```sh
@@ -331,7 +363,7 @@ rejouent des captures réelles (`tests/data/`).
 ```
 bin/                lanceurs : simcockpit-gui, cockpit-panel, simcockpit (ligne de commande)
 config/             configuration : matériel et un dossier par avion
-simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc, radio_airbus)
+simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc, radio_airbus, fdbus)
 simcockpit/diag/    bruit, assistants de test des entrées et des sorties
 simcockpit/logic/   configuration, types de commandes, moteur, atmosphère standard
 simcockpit/gui/     fenêtre de test des cartes

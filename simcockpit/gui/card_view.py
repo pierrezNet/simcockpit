@@ -6,11 +6,11 @@ import time
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (QCheckBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QListWidget, QProgressBar, QPushButton, QSpinBox,
-                               QVBoxLayout,
-                               QWidget)
+                               QVBoxLayout, QWidget)
 
 from ..hw import dme, mastercard, mcp, radio_airbus, usbfmc
 from ..hw.device import Card
+from .fdbus_view import FdbusView
 
 ACTIVE = "#2e9e44"       # vert : entrée actionnée
 REST = "#3a3f47"         # gris : repos
@@ -69,6 +69,9 @@ class CardView(QWidget):
         self.timer.timeout.connect(self._poll)
         if not detected.known:
             self._build_passive()
+            return
+        if detected.type.protocol == "fdbus":
+            self._build_fdbus()
             return
 
         root = QVBoxLayout(self)
@@ -484,6 +487,14 @@ class CardView(QWidget):
                 for b in buttons:
                     b.setChecked(False)
 
+    # ------------------------------------------------------------------ FDBUS (jauges EFDE)
+    def _build_fdbus(self):
+        """Bus des jauges : tout l'onglet est dans gui/fdbus_view.py."""
+        root = QVBoxLayout(self)
+        self.fd_view = FdbusView(self.card, self)
+        root.addWidget(self.fd_view)
+        self.last, self.log, self.status = self.fd_view.last, self.fd_view.log, self.fd_view.status
+
     def _build_passive(self):
         """Carte d'un fabricant connu mais modèle non pris en charge : trames brutes seulement."""
         root = QVBoxLayout(self)
@@ -524,6 +535,8 @@ class CardView(QWidget):
 
     def stop(self):
         self.timer.stop()
+        if hasattr(self, "fd_view"):
+            self.fd_view.stop()
         self.card.stop()
 
     # ------------------------------------------------------------------ événements
@@ -545,6 +558,9 @@ class CardView(QWidget):
                 self._paint(i)
 
     def handle(self, ev):
+        if self.detected.type.protocol == "fdbus":
+            self.fd_view.handle(ev)
+            return
         if ev.kind == "raw":
             hexa = ev.value.hex(" ")
             self._raw_count += 1
