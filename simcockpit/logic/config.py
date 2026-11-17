@@ -15,7 +15,7 @@ import yaml
 
 MATERIEL = "materiel.yaml"
 
-from ..hw import mcp, usbfmc
+from ..hw import fdbus, mcp, usbfmc
 from ..hw.cards import KNOWN, classify
 from . import controls
 
@@ -106,7 +106,9 @@ def load(path):
     return parse(data)
 
 
-def parse(data):
+def parse(data, calibrations=None):
+    """`calibrations` : jauges FDBUS {(adresse, sortie): Calibration} ; par défaut lues
+    dans config/fdbus.yaml (réglées dans le banc de test), seulement si une jauge en a besoin."""
     products = {p for c in KNOWN for p in c.products}
     cards = {}
     for cid, spec in (data.get("cards") or {}).items():
@@ -139,6 +141,15 @@ def parse(data):
                 bad = sorted(set(ctrl.led_states()) - set(names))
                 if bad:
                     raise ConfigError(f"{iid}.{name} : voyants inconnus {bad} (connus : {', '.join(names)})")
+            if hasattr(ctrl, "resolve"):
+                if out != "fdbus":
+                    raise ConfigError(f"{iid}.{name} : une jauge demande la carte EFDE FDBUS")
+                if calibrations is None:
+                    calibrations = fdbus.load_calibrations()
+                try:
+                    ctrl.resolve(calibrations)
+                except ValueError as e:
+                    raise ConfigError(f"{iid}.{name} : {e}") from None
             if hasattr(ctrl, "on_key") and out != "usbfmc":
                 raise ConfigError(f"{iid}.{name} : {ctrl.type} demande un clavier (CDU)")
             if ctrl.led is not None and (out != "mcp" or ctrl.led not in mcp.LEDS):
@@ -162,5 +173,6 @@ def parse(data):
         if not isinstance(sim, dict) or sim.get("type", "xplane") != "xplane":
             raise ConfigError("sim : seul « type: xplane » est pris en charge")
         sim = {"type": "xplane", "host": sim.get("host", "127.0.0.1"),
-               "port": int(sim.get("port", 49000))}
+               "port": int(sim.get("port", 49000)),
+               "web_port": int(sim.get("web_port", 8086))}     # API web (X-Plane 12.1.1+)
     return Cockpit(cards, instruments, sim)

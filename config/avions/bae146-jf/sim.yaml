@@ -1,0 +1,9 @@
+# BAe 146 de Just Flight / Thranda (X-Plane 12, code OACI B462) : liaison UDP avec X-Plane.
+# Lancement : bin/cockpit-panel config/avions/bae146-jf  (X-Plane lancé, 146 chargé)
+# Commencé le 2026-11-17 avec les jauges et le transpondeur ; le reste (MCP → sélecteur de
+# modes, radio) viendra ensuite.
+
+sim:
+  type: xplane
+  host: 127.0.0.1
+  port: 49000

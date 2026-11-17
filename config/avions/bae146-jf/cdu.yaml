@@ -1,0 +1,91 @@
+# CDU OpenCockpits (737) relié au CDU droit (FO) du BAe 146 de Just Flight, dont le FMC
+# est l'UFMC de FJCC.
+# Écran : l'UFMC ne passe pas par l'écran du FMS standard d'X-Plane ; il publie les lignes
+# du CDU du FO dans FJCC/UFMC/LINE_1 à 14 (constaté le 2026-11-17 : avec les touches du
+# commandant, l'écran ne suivait pas), lues par l'API web d'X-Plane (port 8086).
+# Touches : celles du CDU du FO, sim/FMS2/… (relevées dans les objets 3D de l'avion,
+# MENU = dir_intc et NAV RAD = navrad compris) ; l'UFMC les intercepte.
+
+instruments:
+  cdu:
+    label: CDU (FMS)
+    card: cdu
+    controls:
+      ecran:
+        type: ufmc_screen       # écran de l'UFMC (CDU du FO), lu par l'API web d'X-Plane
+      touches:
+        type: keypad
+        keys:
+          LSK1L: sim/FMS2/ls_1l
+          LSK2L: sim/FMS2/ls_2l
+          LSK3L: sim/FMS2/ls_3l
+          LSK4L: sim/FMS2/ls_4l
+          LSK5L: sim/FMS2/ls_5l
+          LSK6L: sim/FMS2/ls_6l
+          LSK1R: sim/FMS2/ls_1r
+          LSK2R: sim/FMS2/ls_2r
+          LSK3R: sim/FMS2/ls_3r
+          LSK4R: sim/FMS2/ls_4r
+          LSK5R: sim/FMS2/ls_5r
+          LSK6R: sim/FMS2/ls_6r
+          "INIT REF": sim/FMS2/index
+          RTE: sim/FMS2/fpln
+          CLB: sim/FMS2/clb
+          CRZ: sim/FMS2/crz
+          DES: sim/FMS2/des
+          MENU: sim/FMS2/dir_intc
+          LEGS: sim/FMS2/legs
+          "DEP ARR": sim/FMS2/dep_arr
+          HOLD: sim/FMS2/hold
+          PROG: sim/FMS2/prog
+          EXEC: sim/FMS2/exec
+          "N1 LIMIT": sim/FMS2/navrad
+          FIX: sim/FMS2/fix
+          "PREV PAGE": sim/FMS2/prev
+          "NEXT PAGE": sim/FMS2/next
+          "0": sim/FMS2/key_0
+          "1": sim/FMS2/key_1
+          "2": sim/FMS2/key_2
+          "3": sim/FMS2/key_3
+          "4": sim/FMS2/key_4
+          "5": sim/FMS2/key_5
+          "6": sim/FMS2/key_6
+          "7": sim/FMS2/key_7
+          "8": sim/FMS2/key_8
+          "9": sim/FMS2/key_9
+          ".": sim/FMS2/key_period
+          "+/-": sim/FMS2/key_minus
+          "/": sim/FMS2/key_slash
+          A: sim/FMS2/key_A
+          B: sim/FMS2/key_B
+          C: sim/FMS2/key_C
+          D: sim/FMS2/key_D
+          E: sim/FMS2/key_E
+          F: sim/FMS2/key_F
+          G: sim/FMS2/key_G
+          H: sim/FMS2/key_H
+          I: sim/FMS2/key_I
+          J: sim/FMS2/key_J
+          K: sim/FMS2/key_K
+          L: sim/FMS2/key_L
+          M: sim/FMS2/key_M
+          N: sim/FMS2/key_N
+          O: sim/FMS2/key_O
+          P: sim/FMS2/key_P
+          Q: sim/FMS2/key_Q
+          R: sim/FMS2/key_R
+          S: sim/FMS2/key_S
+          T: sim/FMS2/key_T
+          U: sim/FMS2/key_U
+          V: sim/FMS2/key_V
+          W: sim/FMS2/key_W
+          X: sim/FMS2/key_X
+          Y: sim/FMS2/key_Y
+          Z: sim/FMS2/key_Z
+          SP: sim/FMS2/key_space
+          DEL: sim/FMS2/key_delete
+          CLR: sim/FMS2/key_clear
+      voyants:
+        type: sim_leds
+        leds:
+          EXEC: FJCC/UFMC/Exec_Light_on_Copilot

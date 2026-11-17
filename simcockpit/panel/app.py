@@ -8,8 +8,8 @@ import time
 
 from PySide6.QtCore import QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import (QApplication, QCheckBox, QDoubleSpinBox, QGridLayout, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox,
+                               QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
                                QPushButton, QScrollArea, QSpinBox, QTabWidget, QVBoxLayout,
                                QWidget)
 
@@ -17,10 +17,15 @@ from ..logic import config
 from ..hw import dme as dme_hw
 from ..logic.controls import Encoder, OctalDigits, Selector, SpeedEncoder, Switch
 from ..logic.dme_indicator import DmeIndicator
+from ..logic.gauges import Gauge
+from ..gui.fdbus_view import format_value
 from ..hw import usbfmc
 from ..logic.radio_panel import RadioPanel
 from ..logic.sim_controls import Commands, Keypad, SimLeds
 from ..logic.cdu_screen import CduScreen
+from ..logic.ufmc_screen import UfmcScreen
+from ..hw import screens
+from .cdu_display import CduCanvas, CduDisplayWindow, screen_names
 from ..logic.rj_autopilot import RjAutopilot
 from ..gui.qtenv import prepare
 from ..gui.winstate import remember
@@ -199,6 +204,51 @@ class DmeWidget(QWidget):
             self.screen.show(*dme_cells(c))
 
 
+class GaugeWidget(QWidget):
+    """Jauge FDBUS : valeur indiquée par l'aiguille, état du module, valeur d'essai."""
+
+    def __init__(self, ctrl):
+        super().__init__()
+        self.ctrl = ctrl
+        lay = QVBoxLayout(self)
+        title = QLabel(f"<b>{ctrl.gauge}</b> <span style='color:#888'>— {ctrl.describe()}</span>")
+        title.setWordWrap(True)
+        lay.addWidget(title)
+        self.lcd = QLabel("—")
+        self.lcd.setStyleSheet(LCD.replace("56px", "34px"))
+        self.lcd.setAlignment(Qt.AlignCenter)
+        lay.addWidget(self.lcd)
+        self.state = QLabel()
+        self.state.setWordWrap(True)
+        lay.addWidget(self.state)
+
+        sim = QGroupBox("Valeur d'essai (sans X-Plane)")
+        self.sim_group = sim                         # grisé quand X-Plane est connecté
+        row = QHBoxLayout(sim)
+        values = sorted(ctrl.calibration.points)
+        span = values[-1] - values[0]
+        self.test = QDoubleSpinBox(minimum=values[0], maximum=values[-1], decimals=0,
+                                   singleStep=max(1, round(span / 50)), value=ctrl.rest,
+                                   suffix=f" {ctrl.unit}" if ctrl.unit else "")
+        self.test.valueChanged.connect(ctrl.set_value)
+        rest = QPushButton("Repos")
+        rest.clicked.connect(lambda: self.test.setValue(ctrl.rest))
+        row.addWidget(self.test, 1)
+        row.addWidget(rest)
+        lay.addWidget(sim)
+        self.show_value(None)
+
+    def show_value(self, _value):
+        c = self.ctrl
+        v = c.shown_value
+        self.lcd.setText("—" if v is None else format_value(v, c.unit))
+        if c.problem:
+            self.state.setText(f"<span style='color:#e55'>{c.problem}</span>")
+        else:
+            self.state.setText(f"<span style='color:#4c4'>module {c.address} (type {c.module.type})"
+                               f"</span> · moteur {c.position}")
+
+
 class AutopilotWidget(QWidget):
     """Pilote automatique RJ : voyants du MCP, état des modes, boutons virtuels."""
 
@@ -349,9 +399,8 @@ class KeypadWidget(QWidget):
 
 
 class CduScreenWidget(QWidget):
-    """Écran du CDU dessiné comme dans l'avion : 16 × 24 caractères, couleurs, deux tailles."""
-    COLORS = {0: "#000000", 1: "#3ad6f0", 2: "#ff4040", 3: "#ffe14d", 4: "#36e05a",
-              5: "#ff5ce6", 6: "#ffb000", 7: "#f2f2f2"}
+    """Écran du CDU dessiné comme dans l'avion, et réglage de l'écran physique du CDU
+    (sortie vidéo, cadrage), gardé dans config/ecrans.yaml."""
 
     LINE = 30            # hauteur d'une ligne de l'écran (px)
     WIDTH = 24 * 26      # 24 colonnes
@@ -361,13 +410,15 @@ class CduScreenWidget(QWidget):
         alignées sur les lignes de données (lignes 2, 4 … 12)."""
         super().__init__()
         self.ctrl = ctrl
-        grid = QGridLayout(self)
+        outer = QVBoxLayout(self)
+        grid = QGridLayout()
         grid.setVerticalSpacing(0)
         grid.setHorizontalSpacing(10)
-        self.screen = _CduCanvas(ctrl, self.COLORS)
-        self.screen.setFixedSize(self.WIDTH + 20, 16 * self.LINE)
-        grid.addWidget(self.screen, 0, 1, 16, 1)
-        for row in range(16):
+        rows = getattr(ctrl, "rows", 16)
+        self.screen = CduCanvas(ctrl)
+        self.screen.setFixedSize(self.WIDTH + 20, rows * self.LINE)
+        grid.addWidget(self.screen, 0, 1, rows, 1)
+        for row in range(rows):
             grid.setRowMinimumHeight(row, self.LINE)
         if keypad is not None:
             for n in range(1, 7):
@@ -381,40 +432,65 @@ class CduScreenWidget(QWidget):
                     b.clicked.connect(lambda _=False, k=name: keypad.press(k))
                     grid.addWidget(b, 2 * n, col)
         grid.setColumnStretch(3, 1)
+        outer.addLayout(grid)
+        self._build_physical(outer)
+
+    # ------------------------------------------------------------ écran physique
+    def _build_physical(self, outer):
+        self.key = f"cdu{self.ctrl.side}"
+        self.setups = screens.load_screens()
+        setup = self.setups.get(self.key, screens.ScreenSetup())
+        self.window = CduDisplayWindow(self.ctrl, self)
+        box = QGroupBox("Écran physique du CDU")
+        g = QGridLayout(box)
+        self.output = QComboBox()
+        self.output.addItem("aucun", "")
+        for name, label in screen_names():
+            self.output.addItem(label, name)
+        if setup.output and self.output.findData(setup.output) < 0:
+            self.output.addItem(f"{setup.output} (absent)", setup.output)
+        self.output.setCurrentIndex(max(0, self.output.findData(setup.output)))
+        g.addWidget(QLabel("Sortie vidéo"), 0, 0)
+        g.addWidget(self.output, 0, 1, 1, 3)
+        self.margins = []
+        for k, label in enumerate(("Marge gauche", "Marge haute", "Marge droite", "Marge basse")):
+            spin = QSpinBox(maximum=2000, suffix=" px", value=setup.margins[k])
+            spin.setToolTip("pour faire tomber l'image dans la découpe de la façade")
+            g.addWidget(QLabel(label), 1 + k // 2, (k % 2) * 2)
+            g.addWidget(spin, 1 + k // 2, (k % 2) * 2 + 1)
+            self.margins.append(spin)
+        self.test_card = QCheckBox("Mire de réglage (cadre et grille)")
+        g.addWidget(self.test_card, 3, 0, 1, 4)
+        self.state = QLabel()
+        g.addWidget(self.state, 4, 0, 1, 4)
+        outer.addWidget(box)
+        self.output.currentIndexChanged.connect(self._changed)
+        for spin in self.margins:
+            spin.valueChanged.connect(self._changed)
+        self.test_card.toggled.connect(self.window.canvas.set_test_card)
+        self._apply(save=False)
+
+    def _changed(self, *_):
+        self._apply(save=True)
+
+    def _apply(self, save):
+        output = self.output.currentData() or ""
+        margins = [s.value() for s in self.margins]
+        self.window.canvas.set_margins(margins)
+        if save:
+            self.setups[self.key] = screens.ScreenSetup(output, margins)
+            screens.save_screens(self.setups)
+        if not output:
+            self.window.hide()
+            self.state.setText("<span style='color:#888'>pas d'écran physique</span>")
+        elif self.window.place(output):
+            self.state.setText(f"<span style='color:#4c4'>affiché sur {output}</span>")
+        else:
+            self.state.setText(f"<span style='color:#e55'>sortie {output} absente</span>")
 
     def show_value(self, _value):
         self.screen.update()
-
-
-class _CduCanvas(QWidget):
-    def __init__(self, ctrl, colors):
-        super().__init__()
-        self.ctrl, self.COLORS = ctrl, colors
-
-    def paintEvent(self, _ev):
-        p = QPainter(self)
-        p.fillRect(self.rect(), QColor("#050505"))
-        cw = (self.width() - 20) / 24
-        lh = self.height() / 16
-        big = QFont("monospace", 1, QFont.Bold)
-        big.setPixelSize(int(lh * 0.85))
-        small = QFont("monospace", 1)
-        small.setPixelSize(int(lh * 0.62))
-        for row, (text, styles) in enumerate(self.ctrl.lines()):
-            y = row * lh
-            for col, ch in enumerate(text):
-                st = styles[col] if col < len(styles) else 0
-                color = QColor(self.COLORS.get(st & 0x07, "#f2f2f2"))
-                rect = QRectF(10 + col * cw, y, cw, lh)
-                if st & 0x40:                          # vidéo inverse
-                    p.fillRect(rect, color)
-                    color = QColor("#050505")
-                if ch == " ":
-                    continue
-                p.setFont(big if st & 0x80 else small)
-                p.setPen(color)
-                p.drawText(rect, Qt.AlignCenter, ch)
-        p.end()
+        self.window.canvas.update()
 
 
 class SimLedsWidget(QWidget):
@@ -585,7 +661,7 @@ class PanelWindow(QMainWindow):
             scroll.setWidgetResizable(True)
             scroll.setWidget(page)
             keypad = next((c for c in inst.controls.values() if isinstance(c, Keypad)), None)
-            has_screen = any(isinstance(c, CduScreen) for c in inst.controls.values())
+            has_screen = any(isinstance(c, (CduScreen, UfmcScreen)) for c in inst.controls.values())
             outer = QVBoxLayout(page)
             outer.addWidget(QLabel(f"<i>carte « {inst.card} » ({cockpit.cards[inst.card].product})</i>"))
             lay = QGridLayout()
@@ -596,7 +672,7 @@ class PanelWindow(QMainWindow):
                 elif isinstance(ctrl, RadioPanel):
                     w = RadioWidget(ctrl)
                     lay.addWidget(w, k // 3, 0, 1, 3)
-                elif isinstance(ctrl, CduScreen):          # façade : LSK de part et d'autre
+                elif isinstance(ctrl, (CduScreen, UfmcScreen)):   # façade : LSK de part et d'autre
                     w = CduScreenWidget(ctrl, keypad)
                     lay.addWidget(w, 40, 0, 1, 3, Qt.AlignHCenter)
                 elif isinstance(ctrl, Keypad):
@@ -606,7 +682,8 @@ class PanelWindow(QMainWindow):
                     w = {SimLeds: SimLedsWidget, Commands: CommandsWidget}[type(ctrl)](ctrl)
                     lay.addWidget(w, 50 + k, 0, 1, 3)
                 else:
-                    w = DmeWidget(ctrl) if isinstance(ctrl, DmeIndicator) else ControlWidget(ctrl)
+                    w = (DmeWidget(ctrl) if isinstance(ctrl, DmeIndicator)
+                         else GaugeWidget(ctrl) if isinstance(ctrl, Gauge) else ControlWidget(ctrl))
                     lay.addWidget(w, k // 3, k % 3)
                 self.widgets[(inst.id, name)] = w
             outer.addLayout(lay)
@@ -660,6 +737,8 @@ class PanelWindow(QMainWindow):
                 self._log(f"⚠ {ch.instrument}.{ch.control} : {alert}")
             if w:
                 w.show_value(ch.value)
+            if getattr(getattr(w, "ctrl", None), "quiet", False):
+                continue                              # valeur continue (jauge) : pas de journal
             self._log(f"{ch.instrument}.{ch.control} = {ch.value}")
 
     def _log(self, text):

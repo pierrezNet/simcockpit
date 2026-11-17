@@ -100,6 +100,7 @@ Nom, unité et étalonnage sont gardés dans `config/fdbus.yaml`, jamais dans le
 ```sh
 bin/cockpit-panel                                # Avro RJ85, logique simulée
 bin/cockpit-panel config/avions/b738-laminar     # Boeing 737-800 de Laminar (X-Plane)
+bin/cockpit-panel config/avions/bae146-jf        # BAe 146 de Just Flight (X-Plane) : MCP, CDU, jauges, transpondeur
 ```
 
 Le panneau connecte les cartes déclarées dans la configuration, applique la logique de
@@ -110,6 +111,15 @@ configuration ».
 
 > Les afficheurs du MCP ne restent allumés **que tant qu'un programme lit la carte**.
 > Gardez donc `bin/cockpit-panel` ou `bin/simcockpit-gui` ouvert.
+
+**Écran du CDU :** dans l'onglet du CDU, « Écran physique du CDU » choisit la sortie vidéo
+de l'écran placé derrière la façade (`xrandr --listmonitors`). Le panneau y ouvre une
+fenêtre plein écran, sans bordure ni curseur, qui reprend l'écran du CDU lu dans X-Plane.
+Les marges et la mire de réglage servent à caler l'image dans la découpe de la façade ;
+le réglage est gardé dans `config/ecrans.yaml`.
+
+> Le bus de jauges FDBUS ne doit être piloté que par **une seule application** : fermez la
+> fenêtre de test avant de lancer un panneau qui utilise des jauges.
 
 ### Mode développement
 
@@ -140,7 +150,9 @@ bin/simcockpit send --port 1-14 "…"       # envoyer une trame brute (essais)
 bin/cockpit-panel config/avions/b738-laminar     # MCP, radio et CDU reliés au Boeing 737-800 de Laminar
 ```
 
-Lancez X-Plane (le port UDP 49000 est ouvert par défaut) et chargez l'avion. X-Plane ne
+Lancez X-Plane (le port UDP 49000 est ouvert par défaut) et chargez l'avion. Les écrans texte publiés par un plugin
+(UFMC du BAe 146) passent par l'API web locale d'X-Plane 12.1.1+ (port 8086, active par défaut) :
+le protocole UDP n'en renvoie que le premier caractère. X-Plane ne
 sert que 500 abonnements par client et perd une partie d'une grosse rafale de demandes :
 le connecteur répartit donc ses abonnements sur plusieurs ports locaux et relance ceux
 qui restent sans réponse (l'écran du CDU en demande à lui seul 1536). Le panneau
@@ -153,16 +165,23 @@ redémarre. À la connexion, la position des interrupteurs du MCP est envoyée �
 config/
 ├── materiel.yaml           # cartes physiques, décrites une seule fois
 ├── fdbus.yaml              # jauges FDBUS : nom, unité, étalonnage (écrit par la fenêtre de test)
+├── ecrans.yaml             # écrans physiques (écran du CDU) : sortie vidéo, marges (écrit par le panneau)
 └── avions/
     ├── rj85-simule/        # Avro RJ85, logique simulée (sans X-Plane)
     │   ├── dme.yaml
     │   ├── mcp.yaml
     │   └── transpondeur.yaml
-    └── b738-laminar/       # Boeing 737-800 de Laminar (X-Plane 12)
-        ├── cdu.yaml        # CDU → FMS du commandant (sim/FMS/…)
-        ├── mcp.yaml
-        ├── radio.yaml      # COM1, COM2, NAV1, NAV2
-        ├── sim.yaml        # liaison X-Plane
+    ├── b738-laminar/       # Boeing 737-800 de Laminar (X-Plane 12)
+    │   ├── cdu.yaml        # CDU → FMS du commandant (sim/FMS/…)
+    │   ├── mcp.yaml
+    │   ├── radio.yaml      # COM1, COM2, NAV1, NAV2
+    │   ├── sim.yaml        # liaison X-Plane
+    │   └── transpondeur.yaml
+    └── bae146-jf/          # BAe 146 de Just Flight (X-Plane 12), en cours
+        ├── cdu.yaml        # CDU → FMS du 146 (mêmes commandes que le 737)
+        ├── jauges.yaml     # vitesse verticale et volets sur les jauges FDBUS
+        ├── mcp.yaml        # MCP 737 → sélecteur de modes, AP et YD du 146
+        ├── sim.yaml
         └── transpondeur.yaml
 ```
 
@@ -207,10 +226,12 @@ instruments:
 | `speed_encoder` | vitesse avec bascule IAS / Mach (bouton C/O) | `toggle_input`, `toggle_level`, `ias`, `mach`, `altitude_from` |
 | `dme_indicator` | indicateur DME Collins IND-42C sur le DME EFDE | `channel`, `self_test`, `backlight` |
 | `radio_panel` | boîtier radio (radio Airbus) : sources COM/NAV/ADF, bagues, transfert, afficheurs | `sources`, `outer`, `inner`, `transfer`, `power`, `power_on`, `button_level` |
-| `cdu_screen` | écran du CDU lu dans X-Plane (16 × 24 caractères, couleurs), affiché dans le panneau | `side` (1 commandant, 2 copilote) |
+| `cdu_screen` | écran du CDU lu dans X-Plane (16 × 24 caractères, couleurs), affiché dans le panneau et, si réglé, en plein écran sur l'écran physique du CDU | `side` (1 commandant, 2 copilote) |
+| `ufmc_screen` | écran de l'UFMC de FJCC (FMC du BAe 146 de Just Flight), lu par l'API web d'X-Plane ; même affichage que `cdu_screen` | — |
 | `keypad` | clavier (CDU) : chaque touche, désignée par son nom, déclenche une commande X-Plane | `keys` |
 | `commands` | poussoirs → commandes X-Plane (`inputs: {entrée: commande}`) | `inputs`, `level` |
 | `sim_leds` | voyants (MCP, CDU) qui suivent des datarefs X-Plane | `leds` |
+| `gauge` | jauge du bus FDBUS, désignée par le nom donné dans la fenêtre de test | `gauge`, `dataref`, `scale`, `rest` |
 | `rj_autopilot` | modes du pilote automatique de l'Avro RJ sur le MCP (voyants compris) | `buttons`, `fd_left`, `fd_right`, `at_arm`, `disengage` |
 
 Options communes à tous les types : `display` (afficheur), `led` (voyant), et pour
@@ -251,6 +272,14 @@ scripts (voir `config/avions/b738-laminar/mcp.yaml`).
   1, 2 ou 3) est fixe, comme sur l'IND-42C. Le HLD de l'avion (appui long sur SEL) n'est
   pas repris : le bouton du DME EFDE ne transmet pas la durée d'appui. En attendant
   X-Plane, le panneau virtuel simule la distance, la vitesse sol et l'identifiant.
+
+- **`gauge` :** le nom (`gauge: Volets`) renvoie, dans `config/fdbus.yaml`, au module, à la
+  sortie et à l'étalonnage réglés dans la fenêtre de test : le profil d'avion dit seulement
+  quelle valeur d'X-Plane la jauge indique (`dataref`, multipliée par `scale` si besoin,
+  par exemple un rapport 0-1 vers des degrés). L'aiguille est placée après
+  l'initialisation du bus, puis suit le simulateur ; sans X-Plane, elle revient sur la
+  valeur de repos (`rest`, 0 par défaut) et le panneau propose une valeur d'essai. Un
+  module absent ou d'un autre type que celui étalonné est signalé et ne reçoit rien.
 
 - **`rj_autopilot` :** en attendant X-Plane, la logique est simulée. Les modes latéraux (HDG,
   NAV, LNAV) sont exclusifs entre eux, de même que les modes verticaux (ALT, VS, LVL CHG,
@@ -365,10 +394,10 @@ bin/                lanceurs : simcockpit-gui, cockpit-panel, simcockpit (ligne 
 config/             configuration : matériel et un dossier par avion
 simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc, radio_airbus, fdbus)
 simcockpit/diag/    bruit, assistants de test des entrées et des sorties
-simcockpit/logic/   configuration, types de commandes, moteur, atmosphère standard
+simcockpit/logic/   configuration, types de commandes (dont les jauges), moteur, atmosphère standard
 simcockpit/gui/     fenêtre de test des cartes
 simcockpit/panel/   panneau virtuel (logique du cockpit)
-simcockpit/sim/     liaison X-Plane (UDP)
+simcockpit/sim/     liaison X-Plane (UDP ; API web locale pour les datarefs texte des plugins)
 tests/              tests unitaires et captures réelles
 udev/               règle d'accès aux cartes
 iocard_test.py      script d'exploration d'origine (référence)

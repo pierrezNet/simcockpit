@@ -1,0 +1,19 @@
+# Jauges EFDE du bus FDBUS. Chaque jauge est désignée par le nom qu'on lui a donné dans
+# le banc de test (onglet FDBUS) : c'est là que se règlent sa sortie de module et
+# l'étalonnage de son cadran (config/fdbus.yaml). Ici, on dit seulement quelle valeur
+# d'X-Plane elle indique. `scale` multiplie la valeur reçue (ex. un rapport 0-1 → degrés).
+# Une seule appli pilote le bus : fermer le banc de test avant de lancer le panneau.
+
+instruments:
+  jauges:
+    label: Jauges
+    card: jauges
+    controls:
+      vitesse_verticale:
+        type: gauge
+        gauge: Vitesse verticale
+        dataref: sim/cockpit2/gauges/indicators/vvi_fpm_pilot   # ft/min
+      volets:
+        type: gauge
+        gauge: Volets
+        dataref: sim/flightmodel2/wing/flap1_deg[0]   # braquage réel des volets, en degrés

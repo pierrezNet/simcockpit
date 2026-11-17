@@ -1,0 +1,6 @@
+# Écrans physiques du cockpit, écrit par le panneau (onglet de l'équipement).
+# sortie : nom de la sortie vidéo (xrandr --listmonitors), marges : gauche, haut, droite,
+# bas en pixels, pour faire tomber l'image dans la découpe de la façade.
+cdu1:
+  sortie: HDMI-2
+  marges: [0, 0, 0, 0]

@@ -7,6 +7,11 @@ Sorties : une commande liée à un afficheur (`display:`) ou à un voyant (`led:
 jour l'état de sortie de sa carte ; les trames sont ensuite envoyées une à une, espacées
 d'au moins WRITE_GAP (le MCP ignore les trames trop rapprochées). Une commande peut aussi
 produire elle-même ses trames (`take_frames`, ex. l'indicateur DME).
+
+Bus de jauges FDBUS : la carte initialise le bus d'elle-même (hw/device.py) ; le moteur
+transmet la liste des modules trouvés aux jauges de la carte (`attach`), qui produisent
+ensuite leurs trames de position. Une seule appli doit piloter le bus : fermer le banc
+de test avant de lancer le panneau.
 """
 
 import queue
@@ -18,6 +23,7 @@ from ..hw.cards import classify
 from ..hw.device import Card
 
 WRITE_GAP = 0.06
+WRITE_GAPS = {"fdbus": 0.01}     # le bus de jauges accepte des trames rapprochées
 
 
 @dataclass
@@ -41,14 +47,21 @@ class Engine:
                         if classify(spec.product).out_protocol in makers}
         self._pending = {cid: {} for cid in cockpit.cards}  # clé de trame -> trame, dans l'ordre
         self._last_write = {}
+        self._gap = {cid: WRITE_GAPS.get(classify(spec.product).out_protocol, WRITE_GAP)
+                     for cid, spec in cockpit.cards.items()}
         # simulateur : connecteur créé à la demande (connect_sim), abonnements par commande
         self.sim = None
         self.sim_connected = False
+        self.web = None                   # API web d'X-Plane (datarefs texte des plugins)
         self._sim_listeners = {}          # dataref -> [commandes]
+        self._web_refs = set()            # datarefs lus par l'API web plutôt que par l'UDP
         for inst in cockpit.instruments.values():
             for ctrl in inst.controls.values():
                 for ref in ctrl.sim_datarefs():
                     self._sim_listeners.setdefault(ref, []).append(ctrl)
+                for ref in ctrl.web_datarefs():
+                    self._sim_listeners.setdefault(ref, []).append(ctrl)
+                    self._web_refs.add(ref)
 
     # ------------------------------------------------------------ cœur, sans matériel
     def feed(self, card_id, raw_inputs, t, active_level):
@@ -114,7 +127,7 @@ class Engine:
     def take_frame(self, card_id, now):
         """Prochaine trame à écrire sur la carte, ou None (rien à faire / trop tôt)."""
         pending = self._pending.get(card_id)
-        if not pending or now - self._last_write.get(card_id, -1e9) < WRITE_GAP:
+        if not pending or now - self._last_write.get(card_id, -1e9) < self._gap.get(card_id, WRITE_GAP):
             return None
         key = next(iter(pending))
         self._last_write[card_id] = now
@@ -136,6 +149,24 @@ class Engine:
         elif out is not None:
             p0, p1 = out.display_frames()
             self._pending[card_id].update({"page0": p0, "page1": p1, "leds": out.led_frame()})
+
+    def bus_ready(self, card_id, modules):
+        """Bus FDBUS initialisé : modules trouvés → jauges de la carte."""
+        for inst in self.cockpit.instruments.values():
+            if inst.card == card_id:
+                for ctrl in inst.controls.values():
+                    if hasattr(ctrl, "attach"):
+                        ctrl.attach(modules)
+        found = ", ".join(str(m.address) for m in modules) or "aucun"
+        self.status[card_id] = f"connectée, modules {found}"
+
+    def bus_failed(self, card_id, reason):
+        for inst in self.cockpit.instruments.values():
+            if inst.card == card_id:
+                for ctrl in inst.controls.values():
+                    if hasattr(ctrl, "bus_failed"):
+                        ctrl.bus_failed(reason)
+        self.status[card_id] = f"connectée, initialisation du bus échouée : {reason}"
 
     def _controls(self):
         for inst in self.cockpit.instruments.values():
@@ -167,7 +198,14 @@ class Engine:
             from ..sim.xplane import XPlane
             self.sim = XPlane(self.cockpit.sim["host"], self.cockpit.sim["port"])
             for ref in self._sim_listeners:
-                self.sim.subscribe(ref)
+                if ref not in self._web_refs:
+                    self.sim.subscribe(ref)
+            if self._web_refs:
+                from ..sim.xplane_web import XPlaneWeb
+                self.web = XPlaneWeb(self.cockpit.sim["host"], self.cockpit.sim["web_port"])
+                for ref in sorted(self._web_refs):
+                    self.web.subscribe(ref)
+                self.web.start()
             for i in range(8):                       # code OACI de l'avion chargé
                 self.sim.subscribe(f"sim/aircraft/view/acf_ICAO[{i}]")
 
@@ -220,13 +258,20 @@ class Engine:
                 elif ev.kind == "state":
                     # horloge absolue : plusieurs cartes, une seule base de temps
                     self.feed(cid, ev.value, card.t0 + ev.t, card.type.active_level)
+                elif ev.kind == "ready" and card.type.protocol == "fdbus":
+                    self.bus_ready(cid, ev.value)
+                elif ev.kind == "init_failed":
+                    self.bus_failed(cid, ev.value)
                 elif ev.kind == "error":
                     self.status[cid] = f"perdue : {ev.value}"
                     card.stop()
                     del self.cards[cid]
         now = time.monotonic()
         if self.sim is not None:
-            for action in self.sim_step(self.sim.poll(), self.sim.connected, now):
+            changed = self.sim.poll()
+            if self.web is not None:
+                changed.update(self.web.poll())
+            for action in self.sim_step(changed, self.sim.connected, now):
                 (self.sim.command if action[0] == "cmd" else self.sim.write)(*action[1:])
         changes = self.poll(now)
         if self.sim is not None:                  # actions nées du poll (interrupteurs…)
@@ -248,3 +293,6 @@ class Engine:
         if self.sim is not None:
             self.sim.close()
             self.sim = None
+        if self.web is not None:
+            self.web.close()
+            self.web = None

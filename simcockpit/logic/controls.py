@@ -32,6 +32,10 @@ class Control:
         """Datarefs à suivre."""
         return [self.blank_unless] if self.blank_unless else []
 
+    def web_datarefs(self):
+        """Datarefs à suivre par l'API web d'X-Plane (texte d'un plugin, ex. écran de l'UFMC)."""
+        return []
+
     def on_sim(self, name, value, t):
         """Nouvelle valeur d'un dataref suivi."""
         self.__dict__.setdefault("_last_sim", {})[name] = value
@@ -163,9 +167,13 @@ class Switch(Control):
     Avec X-Plane : `command_on` / `command_off` sont envoyées à chaque changement de
     position (et à la connexion) ; ou bien `toggle_command` est envoyée tant que
     `state_dataref` (valeur `state_on` = position « on ») ne suit pas l'interrupteur.
+    `command_on` / `command_off` avec `state_dataref` : la commande n'est envoyée que si
+    l'avion n'est pas déjà dans la bonne position, et répétée (au plus MAX_TRIES fois)
+    tant qu'il n'y est pas (interrupteur à commandes haut / bas, ex. FD BARS du BAe 146).
     `invert` : la position « on » est l'entrée au repos (ex. barre DISENGAGE baissée = 0).
     """
     type = "switch"
+    MAX_TRIES = 3
 
     def __init__(self, name, input, invert=False, command_on=None, command_off=None,
                  toggle_command=None, state_dataref=None, state_on=1, **kw):
@@ -175,6 +183,7 @@ class Switch(Control):
         self.toggle_command, self.state_dataref, self.state_on = toggle_command, state_dataref, state_on
         self._sim_state = None
         self._last_toggle = -1e9
+        self._tries = 0
 
     def decode(self, bits):
         return bool(bits[self.indexes[0]]) != self.invert
@@ -185,21 +194,44 @@ class Switch(Control):
             self._push(t)
         return v
 
+    def _stateful(self):
+        """Commandes haut / bas pilotées par l'état de l'avion (pas de bascule)."""
+        return bool(self.state_dataref and not self.toggle_command
+                    and (self.command_on or self.command_off))
+
     def _push(self, t=None):
         if self.value is None or not self.sim_connected:
             return
-        cmd = self.command_on if self.value else self.command_off
-        if cmd:
-            self._sim("cmd", cmd)
+        if self._stateful():
+            self._tries = 0
+        else:
+            cmd = self.command_on if self.value else self.command_off
+            if cmd:
+                self._sim("cmd", cmd)
         self._check_toggle(t)
 
     def _check_toggle(self, t):
-        if not (self.toggle_command and self.state_dataref) or self._sim_state is None:
+        if not self.state_dataref or self._sim_state is None or self.value is None:
+            return
+        if not (self.toggle_command or self._stateful()):
             return
         sim_on = round(self._sim_state) == self.state_on
-        if sim_on != bool(self.value) and (t is None or t - self._last_toggle > 0.5):
-            self._last_toggle = t if t is not None else 0
-            self._sim("cmd", self.toggle_command)
+        if sim_on == bool(self.value):
+            self._tries = 0
+            return
+        if t is not None and t - self._last_toggle <= 0.5:
+            return
+        if self.toggle_command:
+            cmd = self.toggle_command
+        else:
+            if not self.sim_connected or self._tries >= self.MAX_TRIES:
+                return
+            self._tries += 1
+            cmd = self.command_on if self.value else self.command_off
+            if not cmd:
+                return
+        self._last_toggle = t if t is not None else 0
+        self._sim("cmd", cmd)
 
     def sim_datarefs(self):
         return super().sim_datarefs() + ([self.state_dataref] if self.state_dataref else [])
@@ -424,7 +456,10 @@ def make(name, spec):
     from .sim_controls import Commands, Keypad, SimLeds
     from .radio_panel import RadioPanel
     from .cdu_screen import CduScreen
-    for cls in (DmeIndicator, RjAutopilot, Commands, Keypad, SimLeds, RadioPanel, CduScreen):
+    from .gauges import Gauge
+    from .ufmc_screen import UfmcScreen
+    for cls in (DmeIndicator, RjAutopilot, Commands, Keypad, SimLeds, RadioPanel, CduScreen, Gauge,
+                UfmcScreen):
         TYPES.setdefault(cls.type, cls)
     spec = dict(spec)
     kind = spec.pop("type", None)

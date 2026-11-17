@@ -5,6 +5,7 @@ import struct
 import time
 import unittest
 
+from simcockpit.hw import mcp
 from simcockpit.logic import config
 from simcockpit.logic.engine import Engine
 from simcockpit.sim import xplane
@@ -158,3 +159,47 @@ class TestEngineWithSim(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBae146(unittest.TestCase):
+    """MCP relié au BAe 146 de Just Flight (commandes Thranda relevées en lecture seule)."""
+
+    def setUp(self):
+        self.eng = Engine(config.load("config/avions/bae146-jf"))
+        self.state = mcp_rest()
+        self.eng.feed("mcp", self.state, 0.0, active_level=1)
+        self.eng.poll(0.1)
+
+    def press(self, index, t):
+        self.state[index] = 0
+        self.eng.feed("mcp", self.state, t, active_level=1)
+        actions = self.eng.sim_step({}, True, t)
+        self.state[index] = 1
+        self.eng.feed("mcp", self.state, t + 0.2, active_level=1)
+        return actions
+
+    def test_boutons_et_voyants(self):
+        self.eng.sim_step({"thranda/TCAS/AnnLtA[326]": 1.0, "thranda/TCAS/AnnLtA[337]": 1.0},
+                          True, 1.0)
+        self.eng.poll(1.0)
+        self.assertIn(("cmd", "thranda/buttons/Button61"), self.press(19, 2.0))   # CMD A → AP
+        self.assertIn(("cmd", "thranda/buttons/Button07"), self.press(22, 3.0))   # APP → GSL
+        leds = self.eng.outputs["mcp"].leds
+        self.assertTrue(leds & (1 << mcp.LEDS["CMD A"]))
+        self.assertTrue(leds & (1 << mcp.LEDS["HDG SEL"]))
+
+    def test_fd_bars_haut_bas_selon_l_etat_de_l_avion(self):
+        self.state[15] = 1                                   # F/D gauche ON, droit OFF
+        self.eng.feed("mcp", self.state, 0.2, active_level=1)
+        self.eng.poll(0.3)
+        acts = self.eng.sim_step({"thranda/Switch[92]": 2.0, "thranda/Switch[76]": 2.0}, True, 1.0)
+        self.eng.poll(1.0)
+        acts += self.eng.sim_step({}, True, 1.0)
+        self.assertNotIn(("cmd", "thranda/switches/SwitchUp92"), acts)   # déjà sur ON
+        self.assertIn(("cmd", "thranda/switches/SwitchDn76"), acts)
+        acts = self.eng.sim_step({"thranda/Switch[76]": 0.0}, True, 2.0)  # passé sur OFF
+        self.assertEqual(acts, [])
+        # l'avion refuse (reste sur ON) : on réessaie, mais pas indéfiniment
+        tries = sum(("cmd", "thranda/switches/SwitchDn76") in self.eng.sim_step(
+            {"thranda/Switch[76]": 2.0 + k % 2 * 0.001}, True, 3.0 + k) for k in range(8))
+        self.assertEqual(tries, fd_max := 3)

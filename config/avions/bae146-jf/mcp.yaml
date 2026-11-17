@@ -1,0 +1,122 @@
+# MCP OpenCockpits (boutons de 737) relié au pilote automatique du BAe 146 de Just Flight.
+# Le 146 n'a pas de MCP mais un sélecteur de modes sur le glareshield et un boîtier AP / YD
+# sur la console centrale arrière. Ses boutons sont des commandes Thranda sans libellé,
+# relevées en lecture seule (espion RREF) les 2026-11-15 et 2026-11-17 ; chaque mode a son
+# triangle de voyant (thranda/TCAS/AnnLtA[n]), que suit la LED du bouton du MCP.
+# Les modes pilotent le pilote automatique standard d'X-Plane.
+#
+#   MCP (737)   146                 MCP (737)   146
+#   HDG SEL  →  HDG                 LVL CHG  →  IAS
+#   VOR LOC  →  V/L                 SPEED    →  MACH
+#   APP      →  GSL (plan ILS)      N1       →  TURB
+#   ALT HLD  →  ALT                 CWS A    →  ALT ARM
+#   V/S      →  VS                  CWS B    →  B LOC
+#   LNAV     →  L NAV               CMD A    →  AP (engage / désengage)
+#   VNAV     →  V NAV               CMD B    →  YD (amortisseur de lacet)
+#   barre DISENGAGE baissée → déconnexion du PA (comme le bouton de la poignée)
+#
+# Molettes : HDG, CRS1 / CRS2 (COURSE NAV1 / NAV2) et ALT (ALT SEL) sont les consignes
+# standard d'X-Plane. IAS et V/S restent éteints : le 146 n'a pas de consigne de vitesse
+# ni de vitesse verticale (il tient la valeur du moment où le mode s'engage).
+# Conditions pour engager le PA : AVIONICS MASTER A et B, A/P MSTR (plafonnier) sur ON.
+
+instruments:
+  mcp:
+    label: Pilote automatique 146
+    card: mcp
+    controls:
+      crs1:
+        type: encoder
+        inputs: [4, 5]
+        min: 0
+        max: 359
+        wrap: true
+        display: CRS1
+        leading_zeros: true
+        dataref: sim/cockpit2/radios/actuators/nav1_obs_deg_mag_pilot
+      cap:
+        type: encoder
+        inputs: [6, 7]
+        min: 0
+        max: 359
+        wrap: true
+        display: HDG
+        leading_zeros: true
+        dataref: sim/cockpit2/autopilot/heading_dial_deg_mag_pilot
+      altitude:
+        type: encoder
+        inputs: [2, 3]
+        min: 0
+        max: 35000
+        step: 100
+        display: ALT
+        min_digits: 3
+        dataref: sim/cockpit2/autopilot/altitude_dial_ft
+      crs2:
+        type: encoder
+        inputs: [8, 9]
+        min: 0
+        max: 359
+        wrap: true
+        display: CRS2
+        leading_zeros: true
+        # la fenêtre COURSE de droite du 146 lit nav2_obs_degm (côté commandant) ; la valeur
+        # côté copilote, utilisée sur le 737, n'y arrive pas (vérifié le 2026-11-17)
+        dataref: sim/cockpit2/radios/actuators/nav2_obs_deg_mag_pilot
+
+      boutons:
+        type: commands
+        level: 0                      # poussoirs du MCP : 0 pendant l'appui
+        inputs:
+          25: thranda/buttons/Button15     # HDG SEL → HDG
+          23: thranda/buttons/Button06     # VOR LOC → V/L
+          22: thranda/buttons/Button07     # APP     → GSL
+          21: thranda/buttons/Button08     # ALT HLD → ALT
+          20: thranda/buttons/Button11     # V/S     → VS
+          26: thranda/buttons/Button16     # LVL CHG → IAS
+          28: thranda/buttons/Button12     # SPEED   → MACH
+          24: thranda/buttons/Button14     # LNAV    → L NAV
+          27: thranda/buttons/Button13     # VNAV    → V NAV
+          29: thranda/buttons/Button10     # N1      → TURB
+          16: thranda/buttons/Button09     # CWS B   → B LOC
+          17: sim/autopilot/altitude_arm   # CWS A   → ALT ARM
+          19: thranda/buttons/Button61     # CMD A   → AP (console centrale)
+          18: thranda/buttons/Button60     # CMD B   → YD (console centrale)
+
+      voyants:
+        type: sim_leds
+        leds:
+          HDG SEL: thranda/TCAS/AnnLtA[337]
+          VOR LOC: thranda/TCAS/AnnLtA[333]
+          APP: thranda/TCAS/AnnLtA[327]
+          ALT HLD: thranda/TCAS/AnnLtA[328]
+          V/S: thranda/TCAS/AnnLtA[329]
+          LVL CHG: thranda/TCAS/AnnLtA[332]
+          SPEED: thranda/TCAS/AnnLtA[330]
+          LNAV: thranda/TCAS/AnnLtA[336]
+          VNAV: thranda/TCAS/AnnLtA[331]
+          N1: thranda/TCAS/AnnLtA[335]
+          CWS B: thranda/TCAS/AnnLtA[334]
+          CWS A: thranda/TCAS/AnnLtA[338]
+          CMD A: thranda/TCAS/AnnLtA[326]   # triangle AP du glareshield
+          CMD B: thranda/TCAS/AnnLtA[351]   # YD 1
+
+      fd_gauche:                      # FD BARS commandant : Switch[92], 2 = ON
+        type: switch
+        input: 15
+        command_on: thranda/switches/SwitchUp92
+        command_off: thranda/switches/SwitchDn92
+        state_dataref: thranda/Switch[92]
+        state_on: 2
+      fd_droit:                       # FD BARS copilote : Switch[76], 2 = ON
+        type: switch
+        input: 13
+        command_on: thranda/switches/SwitchUp76
+        command_off: thranda/switches/SwitchDn76
+        state_dataref: thranda/Switch[76]
+        state_on: 2
+      disengage:
+        type: switch
+        input: 14
+        invert: true                  # « on » = barre baissée (entrée à 0)
+        command_on: sim/autopilot/servos_off_any
