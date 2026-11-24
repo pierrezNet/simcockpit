@@ -16,3 +16,5 @@ cards:
     product: IOCard-RadioAirb # OpenCockpits radio Airbus (fréquences COM / NAV / ADF)
   jauges:
     product: FDBUS            # EFDE FDBUS (jauges : IVSI, volets) ; réglées dans config/fdbus.yaml
+  tq:
+    product: TCA Q-Eng 1&2    # Thrustmaster TCA Q-Eng 1&2 (manettes des gaz, lu par evdev)

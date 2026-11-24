@@ -5,7 +5,7 @@ import threading
 import time
 from dataclasses import dataclass
 
-from . import bitmap, dme, fdbus, mastercard, usbfmc
+from . import bitmap, dme, evdev, fdbus, mastercard, usbfmc
 from .cards import CardType
 from .debounce import Debouncer
 from .hidraw import HidDevice, HidInfo
@@ -50,6 +50,14 @@ class Card:
         return value == self.type.active_level
 
     def start(self):
+        if self.type.protocol == "evdev":       # joystick : lu par evdev, jamais écrit
+            node = evdev.event_node(self.info.path)
+            if node is None:
+                raise OSError(f"pas de nœud evdev pour {self.info.path}")
+            self.dev = evdev.EvdevDevice(node)
+            self._thread = threading.Thread(target=self._run_evdev, name=self.name, daemon=True)
+            self._thread.start()
+            return self
         passive = not self.type.send_init
         self.dev = HidDevice(self.info.path, writable=not passive)
         if not passive and self.type.init:
@@ -123,6 +131,24 @@ class Card:
                     ready = True
                     self._emit("ready", value=list(self.debouncer.stable))
         except OSError as e:  # carte débranchée, erreur USB…
+            self._emit("error", value=str(e))
+
+    def _run_evdev(self):
+        """Axes en 0..1 (« axis » : index = n° d'axe evdev) ; position initiale émise d'emblée."""
+        dev = self.dev
+        try:
+            for axis, raw in sorted(dev.initial.items()):
+                self.axes[axis] = dev.axis_value(axis, raw)
+                self._emit("axis", index=axis, value=self.axes[axis])
+            self._emit("ready", value=[0] * mastercard.INPUTS)
+            while not self._stop.is_set():
+                for typ, code, raw in dev.read(timeout=0.05):
+                    if typ == evdev.EV_ABS:
+                        value = dev.axis_value(code, raw)
+                        if self.axes.get(code) != value:
+                            self.axes[code] = value
+                            self._emit("axis", index=code, value=value)
+        except OSError as e:
             self._emit("error", value=str(e))
 
     # délai sans nouvelle trame au-delà duquel une étape de l'initialisation FDBUS échoue

@@ -103,12 +103,25 @@ EFDE_FDBUS = CardType(
     verified="initialisation ; moteur X27 (IVSI) et carte analogique 12 V (volets), webcam",
 )
 
+TCA_QENG = CardType(
+    key="tca_qeng",
+    label="Thrustmaster TCA Q-Eng 1&2 (manettes des gaz)",
+    products=("TCA Q-Eng 1&2",),
+    protocol="evdev",          # joystick standard : axes lus par evdev (hw/evdev.py)
+    active_level=1,
+    inputs=0, outputs=0, axes=7,
+    send_init=False,           # rien n'est jamais écrit
+    init=False,
+    verified="axes 0 et 1 = manettes gauche et droite (0 = plein gaz), 2026-11-24",
+)
+
 UNKNOWN = CardType(
     key="unknown", label="Carte inconnue", products=(), protocol="unknown",
     active_level=1, inputs=0, outputs=0, axes=0, send_init=False,
 )
 
-KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME, OC_USBFMC, OC_RADIO_AIRBUS, EFDE_FDBUS)
+KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME, OC_USBFMC, OC_RADIO_AIRBUS, EFDE_FDBUS,
+         TCA_QENG)
 
 
 def classify(product: str) -> CardType:

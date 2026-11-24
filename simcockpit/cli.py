@@ -153,6 +153,24 @@ def cmd_send(args):
     return 0
 
 
+def cmd_fonctions(args):
+    """Dictionnaire des fonctions : noms logiques à citer dans les profils d'avion."""
+    from .logic import config
+    from .logic.dictionary import Dictionary, load_base
+    if args.avion:
+        try:
+            dictionary = config.load(args.avion).dictionary
+        except config.ConfigError as e:
+            print(f"configuration invalide : {e}", file=sys.stderr)
+            return 1
+    else:
+        dictionary = Dictionary()
+        dictionary.extend(load_base(args.simulateur), f"dictionnaire/{args.simulateur}.yaml")
+    lines = dictionary.describe(args.filtre or "")
+    print("\n".join(lines) if lines else "aucune fonction ne correspond")
+    return 0
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="simcockpit", description="Cartes de home cockpit sous Linux")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -197,6 +215,12 @@ def main(argv=None):
     s.add_argument("--first", type=int, default=11, help="première sortie SIOC (défaut 11)")
     s.add_argument("--last", type=int, help="dernière sortie (défaut : selon la carte)")
     s.set_defaults(func=cmd_outputs)
+
+    s = sub.add_parser("fonctions", help="dictionnaire des fonctions (noms logiques des YAML)")
+    s.add_argument("avion", nargs="?", help="dossier d'avion : base du simulateur + ses fonctions")
+    s.add_argument("--filtre", help="seulement les fonctions dont le nom ou la description contient ce texte")
+    s.add_argument("--simulateur", default="xplane", help="sans dossier d'avion (défaut xplane)")
+    s.set_defaults(func=cmd_fonctions)
 
     args = p.parse_args(argv)
     return args.func(args)

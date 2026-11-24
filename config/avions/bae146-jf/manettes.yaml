@@ -1,0 +1,31 @@
+# Manettes des gaz : TQ Thrustmaster TCA Q-Eng 1&2 (deux manettes) sur les quatre moteurs
+# du 146, la gauche pour les moteurs 1 et 2, la droite pour les moteurs 3 et 4.
+# Positions relevées le 2026-11-24 (0 = tout en avant, 1 = fond de la reverse) :
+# plein gaz 0,00 à 0,03 ; cran de reverse 0,72 (≈ 47 000 / 65 535).
+# Le 146 n'a pas d'inverseur : derrière son ralenti se trouve la position OFF (carburant
+# coupé). Le cran du TQ sert de ralenti ; bien derrière (au-delà de 0,80), la manette
+# passe sur OFF ; on démarre l'injection en ramenant la manette de OFF au cran.
+# À faire dans X-Plane : désaffecter les deux axes du TQ (Réglages → Joystick), sinon
+# X-Plane et simcockpit écrivent tous deux la poussée.
+
+instruments:
+  manettes:
+    label: Manettes des gaz
+    card: tq
+    controls:
+      gauche:
+        type: throttle_axis
+        axis: 0
+        datarefs: [moteur1.manette, moteur2.manette]
+        ralenti: 0.70           # un peu avant le cran : le cran donne bien 0 %
+        plein_gaz: 0.03
+        coupure: 0.80           # au-delà : OFF (on en ressort en revenant à 0,77)
+        valeur_coupure: -0.1    # OFF des manettes Thranda
+      droite:
+        type: throttle_axis
+        axis: 1
+        datarefs: [moteur3.manette, moteur4.manette]
+        ralenti: 0.70
+        plein_gaz: 0.03
+        coupure: 0.80
+        valeur_coupure: -0.1

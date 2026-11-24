@@ -26,6 +26,7 @@ officiel d'OpenCockpits, qui ne fonctionne que sous Windows.
 | OpenCockpits radio Airbus | `IOCard-RadioAirb` | ✅ 8 poussoirs, ON/OFF, double rotatif | ✅ 2 afficheurs de 6 chiffres, points décimaux, 8 voyants |
 | OpenCockpits CDU 737 | `USBFMC V1.0` | ✅ 70 touches | ✅ 5 voyants (OFST, MSG, EXEC, DSPY, FAIL) |
 | EFDE FDBUS (bus de jauges) | `FDBUS` | — | ✅ modules moteur X27 et analogique 12 V : position de l'aiguille |
+| Thrustmaster TCA Q-Eng 1&2 (manettes des gaz) | `TCA Q-Eng 1&2` | ✅ 2 manettes (axes lus par evdev, sans règle udev) | — |
 | OpenCockpits USB Expansion + Master Card | `IOCardUSB` | ✅ 72 entrées (la Master Card doit être alimentée) | ⚠️ codage connu, non testé |
 
 Une carte d'un de ces fabricants dont le modèle est inconnu est quand même détectée.
@@ -142,6 +143,7 @@ bin/simcockpit check                      # assistant : tester les entrées born
 bin/simcockpit outputs                    # assistant : tester les sorties une par une
 bin/simcockpit listen --port 1-14         # trames brutes, sans rien envoyer
 bin/simcockpit send --port 1-14 "…"       # envoyer une trame brute (essais)
+bin/simcockpit fonctions [dossier d'avion] [--filtre hdg]   # dictionnaire des fonctions
 ```
 
 ### Avec X-Plane 12
@@ -166,6 +168,8 @@ config/
 ├── materiel.yaml           # cartes physiques, décrites une seule fois
 ├── fdbus.yaml              # jauges FDBUS : nom, unité, étalonnage (écrit par la fenêtre de test)
 ├── ecrans.yaml             # écrans physiques (écran du CDU) : sortie vidéo, marges (écrit par le panneau)
+├── dictionnaire/
+│   └── xplane.yaml         # fonctions → datarefs et commandes standard d'X-Plane
 └── avions/
     ├── rj85-simule/        # Avro RJ85, logique simulée (sans X-Plane)
     │   ├── dme.yaml
@@ -179,7 +183,9 @@ config/
     │   └── transpondeur.yaml
     └── bae146-jf/          # BAe 146 de Just Flight (X-Plane 12), en cours
         ├── cdu.yaml        # CDU → FMS du 146 (mêmes commandes que le 737)
+        ├── fonctions.yaml  # fonctions propres au 146 (boutons et voyants Thranda)
         ├── jauges.yaml     # vitesse verticale et volets sur les jauges FDBUS
+        ├── manettes.yaml   # TQ à 2 manettes → moteurs 1-2 et 3-4
         ├── mcp.yaml        # MCP 737 → sélecteur de modes, AP et YD du 146
         ├── sim.yaml
         └── transpondeur.yaml
@@ -194,6 +200,56 @@ config/
   l'avion sont ouvertes.
 - Pour un nouvel avion, copiez un dossier et adaptez-le. Un fichier YAML unique et
   complet (`cards` + `instruments`) reste accepté.
+
+### Dictionnaire des fonctions
+
+Un profil désigne ce qu'il pilote par le **nom logique** d'une fonction de l'avion
+(`transpondeur.code`, `pa.mode.hdg`, `volets.angle`) plutôt que par un dataref ou une
+commande. Le dictionnaire dit comment chaque fonction s'obtient dans le simulateur :
+
+- `config/dictionnaire/xplane.yaml` : les datarefs et commandes standard d'X-Plane, valables
+  pour tous les avions qui utilisent ses systèmes. N'y entrent que des branchements vérifiés
+  sur un avion (champ `verifie`) ;
+- la section `fonctions:` d'un fichier du dossier de l'avion ajoute ou remplace des
+  fonctions : boutons propres à l'avion (BAe 146 de Thranda), ou fonction standard
+  qui s'y obtient autrement.
+
+```yaml
+# config/dictionnaire/xplane.yaml
+fonctions:
+  transpondeur.mode:
+    description: mode du transpondeur
+    dataref: sim/cockpit2/radios/actuators/transponder_mode
+    valeurs: {"OFF": 0, STBY: 1, "ON": 2, ALT: 3}
+    verifie: 2026-11-14, Boeing 737-800 Laminar
+
+# config/avions/bae146-jf/fonctions.yaml
+fonctions:
+  pa.mode.hdg:
+    description: mode HDG (cap affiché)
+    commande: thranda/buttons/Button15
+  pa.mode.hdg.voyant:
+    dataref: thranda/TCAS/AnnLtA[337]
+```
+
+Dans un profil, on cite une fonction de deux façons :
+
+- `fonction: transpondeur.mode` sur une commande : ses paramètres de branchement
+  (`dataref`, `dataref_values`, `command_on`…) viennent du dictionnaire, sauf ceux que la
+  commande donne elle-même ;
+- un nom logique à la place d'un dataref ou d'une commande : `command_on: pa.deconnexion`,
+  `25: pa.mode.hdg` dans les poussoirs (`commands`), `HDG SEL: pa.mode.hdg.voyant` dans les
+  voyants (`sim_leds`), une touche dans un clavier (`keypad`).
+
+Un nom qui contient `/` est un vrai dataref ou une vraie commande, gardé tel quel : les
+profils écrits avant le dictionnaire fonctionnent toujours. Un nom inconnu est refusé au
+chargement, avec les noms proches. Champs d'une entrée : `dataref`, `valeurs`, `commande`,
+`commande_on`, `commande_off`, `bascule`, `etat`, `etat_on`, `echelle` ; et pour la
+documentation, `description`, `unite`, `verifie`. Pour consulter le dictionnaire :
+
+```sh
+bin/simcockpit fonctions config/avions/bae146-jf --filtre pa.mode
+```
 
 Les numéros d'entrées sont ceux affichés par `simcockpit-gui`. Exemple d'instrument :
 
@@ -232,6 +288,7 @@ instruments:
 | `commands` | poussoirs → commandes X-Plane (`inputs: {entrée: commande}`) | `inputs`, `level` |
 | `sim_leds` | voyants (MCP, CDU) qui suivent des datarefs X-Plane | `leds` |
 | `gauge` | jauge du bus FDBUS, désignée par le nom donné dans la fenêtre de test | `gauge`, `dataref`, `scale`, `rest` |
+| `throttle_axis` | manette des gaz : un axe pilote la poussée d'un ou plusieurs moteurs (cran = ralenti) | `axis`, `datarefs`, `ralenti`, `plein_gaz`, `coupure`, `valeur_coupure` |
 | `rj_autopilot` | modes du pilote automatique de l'Avro RJ sur le MCP (voyants compris) | `buttons`, `fd_left`, `fd_right`, `at_arm`, `disengage` |
 
 Options communes à tous les types : `display` (afficheur), `led` (voyant), et pour
@@ -280,6 +337,17 @@ scripts (voir `config/avions/b738-laminar/mcp.yaml`).
   l'initialisation du bus, puis suit le simulateur ; sans X-Plane, elle revient sur la
   valeur de repos (`rest`, 0 par défaut) et le panneau propose une valeur d'essai. Un
   module absent ou d'un autre type que celui étalonné est signalé et ne reçoit rien.
+
+- **`throttle_axis` :** la position de l'axe (0 à 1) devient une poussée entre deux repères :
+  `ralenti` (poussée 0) et `plein_gaz` (poussée 1), dans un sens ou dans l'autre. Au-delà
+  du ralenti, côté reverse, la poussée reste nulle. La même poussée est écrite sur chaque
+  dataref de `datarefs` (`[moteur1.manette, moteur2.manette]` : une manette pour deux
+  moteurs). Désaffectez ces axes dans les réglages joystick d'X-Plane, sinon X-Plane
+  écrit aussi la poussée.
+  Avec `coupure` (une position encore plus loin que le ralenti), la manette écrit
+  `valeur_coupure` : c'est la position OFF (carburant coupé) des avions sans inverseur,
+  comme le BAe 146 (−0,1 pour ses manettes Thranda). On en ressort en revenant un peu vers
+  le cran (0,03), pour qu'une vibration près du seuil ne coupe pas le moteur.
 
 - **`rj_autopilot` :** en attendant X-Plane, la logique est simulée. Les modes latéraux (HDG,
   NAV, LNAV) sont exclusifs entre eux, de même que les modes verticaux (ALT, VS, LVL CHG,
@@ -394,7 +462,7 @@ bin/                lanceurs : simcockpit-gui, cockpit-panel, simcockpit (ligne 
 config/             configuration : matériel et un dossier par avion
 simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc, radio_airbus, fdbus)
 simcockpit/diag/    bruit, assistants de test des entrées et des sorties
-simcockpit/logic/   configuration, types de commandes (dont les jauges), moteur, atmosphère standard
+simcockpit/logic/   configuration, dictionnaire des fonctions, types de commandes (dont les jauges), moteur, atmosphère standard
 simcockpit/gui/     fenêtre de test des cartes
 simcockpit/panel/   panneau virtuel (logique du cockpit)
 simcockpit/sim/     liaison X-Plane (UDP ; API web locale pour les datarefs texte des plugins)

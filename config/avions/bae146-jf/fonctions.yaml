@@ -1,0 +1,112 @@
+# Fonctions propres au BAe 146 de Just Flight / Thranda, en plus du dictionnaire standard
+# d'X-Plane (config/dictionnaire/xplane.yaml). Les boutons Thranda n'ont pas de libellé :
+# relevés en lecture seule (espion RREF) les 2026-11-15 et 2026-11-17, pendant que
+# l'utilisateur cliquait dans le cockpit 3D. Chaque mode du sélecteur de modes
+# (glareshield) a son bouton et son triangle de voyant (thranda/TCAS/AnnLtA[n]) ;
+# les modes pilotent le pilote automatique standard d'X-Plane.
+
+fonctions:
+  # --- Boîtier AP / YD (console centrale arrière)
+  pa.engage:
+    description: engage ou désengage le pilote automatique (bouton AP, témoin IN)
+    commande: thranda/buttons/Button61
+  pa.engage.voyant:
+    description: triangle AP du sélecteur de modes (PA engagé)
+    dataref: thranda/TCAS/AnnLtA[326]
+  amortisseur_lacet.engage:
+    description: engage les amortisseurs de lacet (bouton YD)
+    commande: thranda/buttons/Button60
+  amortisseur_lacet.engage.voyant:
+    description: témoin YD 1 (YD 2 = AnnLtA[352])
+    dataref: thranda/TCAS/AnnLtA[351]
+
+  # --- Sélecteur de modes (glareshield)
+  pa.mode.hdg:
+    description: mode HDG (cap affiché)
+    commande: thranda/buttons/Button15
+  pa.mode.hdg.voyant:
+    dataref: thranda/TCAS/AnnLtA[337]
+  pa.mode.vl:
+    description: mode V/L (radiale VOR ou localizer)
+    commande: thranda/buttons/Button06
+  pa.mode.vl.voyant:
+    dataref: thranda/TCAS/AnnLtA[333]
+  pa.mode.gsl:
+    description: mode GSL (plan de descente ILS)
+    commande: thranda/buttons/Button07
+  pa.mode.gsl.voyant:
+    dataref: thranda/TCAS/AnnLtA[327]
+  pa.mode.alt:
+    description: mode ALT (tenue d'altitude)
+    commande: thranda/buttons/Button08
+  pa.mode.alt.voyant:
+    dataref: thranda/TCAS/AnnLtA[328]
+  pa.mode.vs:
+    description: mode VS (vitesse verticale du moment)
+    commande: thranda/buttons/Button11
+  pa.mode.vs.voyant:
+    dataref: thranda/TCAS/AnnLtA[329]
+  pa.mode.ias:
+    description: mode IAS (vitesse indiquée par l'assiette)
+    commande: thranda/buttons/Button16
+  pa.mode.ias.voyant:
+    dataref: thranda/TCAS/AnnLtA[332]
+  pa.mode.mach:
+    description: mode MACH
+    commande: thranda/buttons/Button12
+  pa.mode.mach.voyant:
+    dataref: thranda/TCAS/AnnLtA[330]
+  pa.mode.lnav:
+    description: mode L NAV (route du FMC)
+    commande: thranda/buttons/Button14
+  pa.mode.lnav.voyant:
+    dataref: thranda/TCAS/AnnLtA[336]
+  pa.mode.vnav:
+    description: mode V NAV (non disponible sur cet avion d'après le manuel)
+    commande: thranda/buttons/Button13
+  pa.mode.vnav.voyant:
+    dataref: thranda/TCAS/AnnLtA[331]
+  pa.mode.turb:
+    description: mode TURB (turbulence)
+    commande: thranda/buttons/Button10
+  pa.mode.turb.voyant:
+    dataref: thranda/TCAS/AnnLtA[335]
+  pa.mode.bloc:
+    description: mode B LOC (localizer en back course)
+    commande: thranda/buttons/Button09
+  pa.mode.bloc.voyant:
+    dataref: thranda/TCAS/AnnLtA[334]
+  pa.altitude_arm.voyant:
+    description: triangle ALT ARM (la commande est la standard pa.altitude_arm)
+    dataref: thranda/TCAS/AnnLtA[338]
+
+  # --- Directeurs de vol : interrupteurs FD BARS à commandes haut / bas, 2 = ON
+  fd.gauche:
+    description: "FD BARS du commandant (Switch[92]) ; haut = ON confirmé, mais les barres
+      retombent parfois (à revoir)"
+    commande_on: thranda/switches/SwitchUp92
+    commande_off: thranda/switches/SwitchDn92
+    etat: thranda/Switch[92]
+    etat_on: 2
+  fd.droit:
+    description: FD BARS du copilote (Switch[76])
+    commande_on: thranda/switches/SwitchUp76
+    commande_off: thranda/switches/SwitchDn76
+    etat: thranda/Switch[76]
+    etat_on: 2
+
+  # --- Manettes de poussée : manettes Thranda (relevées dans les objets 3D le 2026-11-24).
+  #     -0,1 = OFF (carburant coupé, derrière le verrou), 0 = ralenti, 1 = plein gaz ;
+  #     le plugin en déduit la poussée standard d'X-Plane (throttle_ratio).
+  moteur1.manette:
+    description: manette du moteur 1 (−0,1 OFF, 0 ralenti, 1 plein gaz)
+    dataref: thranda/cockpit/Throttle[0]
+  moteur2.manette:
+    description: manette du moteur 2 (−0,1 OFF, 0 ralenti, 1 plein gaz)
+    dataref: thranda/cockpit/Throttle[1]
+  moteur3.manette:
+    description: manette du moteur 3 (−0,1 OFF, 0 ralenti, 1 plein gaz)
+    dataref: thranda/cockpit/Throttle[2]
+  moteur4.manette:
+    description: manette du moteur 4 (−0,1 OFF, 0 ralenti, 1 plein gaz)
+    dataref: thranda/cockpit/Throttle[3]

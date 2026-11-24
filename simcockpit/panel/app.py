@@ -18,6 +18,7 @@ from ..hw import dme as dme_hw
 from ..logic.controls import Encoder, OctalDigits, Selector, SpeedEncoder, Switch
 from ..logic.dme_indicator import DmeIndicator
 from ..logic.gauges import Gauge
+from ..logic.throttle import ThrottleAxis
 from ..gui.fdbus_view import format_value
 from ..hw import usbfmc
 from ..logic.radio_panel import RadioPanel
@@ -578,6 +579,13 @@ class ControlWidget(QWidget):
             self.ind = QLabel("—")
             self.ind.setStyleSheet(POS_OFF)
             lay.addWidget(self.ind)
+        elif isinstance(ctrl, ThrottleAxis):
+            self.lcd = QLabel("— %")
+            self.lcd.setStyleSheet(LCD.replace("56px", "34px"))
+            self.lcd.setAlignment(Qt.AlignCenter)
+            lay.addWidget(self.lcd)
+            self.detail = QLabel("manette pas encore lue")
+            lay.addWidget(self.detail)
 
     def show_value(self, value):
         if isinstance(self.ctrl, SpeedEncoder):
@@ -599,6 +607,16 @@ class ControlWidget(QWidget):
         elif isinstance(self.ctrl, Switch):
             self.ind.setText("ON" if value else "OFF")
             self.ind.setStyleSheet(POS_ON if value else POS_OFF)
+        elif isinstance(self.ctrl, ThrottleAxis) and self.ctrl.ratio is not None:
+            c = self.ctrl
+            self.lcd.setText(f"{c.ratio * 100:.0f} %")
+            zone = ("OFF : carburant coupé" if c.cutoff
+                    else "derrière le cran (ralenti)" if (c.position - c.idle) * (c.full - c.idle) < 0
+                    else "plein gaz" if c.ratio >= 1 else "")
+            if c.cutoff:
+                self.lcd.setText("OFF")
+            self.detail.setText(f"position {c.position:.3f}  (ralenti {c.idle:g},"
+                                f" plein gaz {c.full:g})  {zone}")
 
 
 class PanelWindow(QMainWindow):

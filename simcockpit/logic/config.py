@@ -3,9 +3,13 @@
 Deux formes :
 - un fichier unique (cartes + instruments + liaison simulateur) ;
 - un dossier d'avion (ex. config/avions/b738-laminar/) : chaque fichier .yaml du dossier
-  apporte des instruments (et éventuellement `sim:`), et les cartes viennent du fichier
-  `materiel.yaml` trouvé dans le dossier ou l'un de ses parents. Seules les cartes
-  utilisées par les instruments sont ouvertes.
+  apporte des instruments (et éventuellement `sim:` ou `fonctions:`), et les cartes
+  viennent du fichier `materiel.yaml` trouvé dans le dossier ou l'un de ses parents.
+  Seules les cartes utilisées par les instruments sont ouvertes.
+
+Les noms logiques de fonctions (« fonction: transpondeur.code ») sont résolus avec le
+dictionnaire du simulateur (config/dictionnaire/xplane.yaml) complété par les sections
+`fonctions:` du profil : voir logic/dictionary.py.
 """
 
 import os
@@ -18,6 +22,7 @@ MATERIEL = "materiel.yaml"
 from ..hw import fdbus, mcp, usbfmc
 from ..hw.cards import KNOWN, classify
 from . import controls
+from .dictionary import Dictionary, DictionaryError, load_base
 
 
 @dataclass
@@ -40,6 +45,7 @@ class Cockpit:
     cards: dict
     instruments: dict
     sim: dict = None          # ex. {"type": "xplane", "host": "127.0.0.1", "port": 49000}
+    dictionary: Dictionary = None   # fonctions connues (base du simulateur + profil)
 
 
 class ConfigError(ValueError):
@@ -83,20 +89,26 @@ def load(path):
     materiel = find_materiel(path)
     if materiel is None:
         raise ConfigError(f"{path} : aucun {MATERIEL} dans ce dossier ni au-dessus")
-    data = {"cards": dict(_read(materiel).get("cards") or {}), "instruments": {}}
+    data = {"cards": dict(_read(materiel).get("cards") or {}), "instruments": {}, "fonctions": {}}
     files = sorted(f for f in os.listdir(path) if f.endswith((".yaml", ".yml")) and f != MATERIEL)
     if not files:
         raise ConfigError(f"{path} : aucun fichier .yaml d'instruments")
     for name in files:
         part = _read(os.path.join(path, name))
         for key in part:
-            if key not in ("cards", "instruments", "sim"):
+            if key not in ("cards", "instruments", "sim", "fonctions"):
                 raise ConfigError(f"{name} : section inconnue « {key} »")
         for iid, spec in (part.get("instruments") or {}).items():
             if iid in data["instruments"]:
                 raise ConfigError(f"{name} : instrument « {iid} » déjà défini dans un autre fichier")
             data["instruments"][iid] = spec
         data["cards"].update(part.get("cards") or {})      # carte propre à cet avion
+        for fname, entry in (part.get("fonctions") or {}).items():
+            if fname in data["fonctions"]:
+                raise ConfigError(f"{name} : fonction « {fname} » déjà définie dans un autre fichier")
+            data["fonctions"][fname] = entry
+            data.setdefault("_fonctions_origine", {})[fname] = \
+                f"{os.path.basename(os.path.abspath(path))}/{name}"
         if "sim" in part:
             if "sim" in data:
                 raise ConfigError(f"{name} : section sim déjà définie dans un autre fichier")
@@ -116,6 +128,7 @@ def parse(data, calibrations=None):
             raise ConfigError(f"carte {cid} : produit {spec.get('product')!r} inconnu"
                               f" (connus : {sorted(products)})")
         cards[cid] = CardSpec(cid, spec["product"], spec.get("usb_port"))
+    dictionary = _dictionary(data)
     instruments = {}
     for iid, spec in (data.get("instruments") or {}).items():
         card = spec.get("card")
@@ -125,7 +138,9 @@ def parse(data, calibrations=None):
         used = {}
         for name, cspec in (spec.get("controls") or {}).items():
             try:
-                ctrl = controls.make(name, cspec)
+                ctrl = controls.make(name, dictionary.resolve(cspec, f"{iid}.{name}"))
+            except DictionaryError as e:
+                raise ConfigError(str(e)) from None
             except (TypeError, ValueError) as e:
                 raise ConfigError(f"{iid}.{name} : {e}") from None
             out = classify(cards[card].product).out_protocol
@@ -170,9 +185,27 @@ def parse(data, calibrations=None):
         instruments[iid] = Instrument(iid, spec.get("label", iid), card, ctrls)
     sim = data.get("sim")
     if sim is not None:
+        sim = dict(sim)
         if not isinstance(sim, dict) or sim.get("type", "xplane") != "xplane":
             raise ConfigError("sim : seul « type: xplane » est pris en charge")
         sim = {"type": "xplane", "host": sim.get("host", "127.0.0.1"),
                "port": int(sim.get("port", 49000)),
                "web_port": int(sim.get("web_port", 8086))}     # API web (X-Plane 12.1.1+)
-    return Cockpit(cards, instruments, sim)
+    return Cockpit(cards, instruments, sim, dictionary)
+
+
+def _dictionary(data):
+    """Dictionnaire des fonctions : base du simulateur déclaré, puis sections `fonctions:`."""
+    sim = data.get("sim")
+    simulator = sim.get("type", "xplane") if isinstance(sim, dict) else None
+    try:
+        dictionary = Dictionary()
+        if simulator:
+            base = load_base(simulator)
+            dictionary.extend(base, f"dictionnaire/{simulator}.yaml")
+        origin = data.get("_fonctions_origine", {})
+        for fname, entry in (data.get("fonctions") or {}).items():
+            dictionary.extend({fname: entry}, origin.get(fname, "configuration"))
+    except DictionaryError as e:
+        raise ConfigError(str(e)) from None
+    return dictionary

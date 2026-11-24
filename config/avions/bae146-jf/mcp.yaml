@@ -1,9 +1,8 @@
 # MCP OpenCockpits (boutons de 737) relié au pilote automatique du BAe 146 de Just Flight.
 # Le 146 n'a pas de MCP mais un sélecteur de modes sur le glareshield et un boîtier AP / YD
-# sur la console centrale arrière. Ses boutons sont des commandes Thranda sans libellé,
-# relevées en lecture seule (espion RREF) les 2026-11-15 et 2026-11-17 ; chaque mode a son
-# triangle de voyant (thranda/TCAS/AnnLtA[n]), que suit la LED du bouton du MCP.
-# Les modes pilotent le pilote automatique standard d'X-Plane.
+# sur la console centrale arrière. Les fonctions (pa.mode.hdg, pa.engage…) et leurs voyants
+# sont dans fonctions.yaml (boutons Thranda) et dans le dictionnaire standard d'X-Plane ;
+# la LED de chaque bouton du MCP suit le voyant de son mode.
 #
 #   MCP (737)   146                 MCP (737)   146
 #   HDG SEL  →  HDG                 LVL CHG  →  IAS
@@ -33,7 +32,7 @@ instruments:
         wrap: true
         display: CRS1
         leading_zeros: true
-        dataref: sim/cockpit2/radios/actuators/nav1_obs_deg_mag_pilot
+        fonction: nav1.course
       cap:
         type: encoder
         inputs: [6, 7]
@@ -42,7 +41,7 @@ instruments:
         wrap: true
         display: HDG
         leading_zeros: true
-        dataref: sim/cockpit2/autopilot/heading_dial_deg_mag_pilot
+        fonction: pa.cap
       altitude:
         type: encoder
         inputs: [2, 3]
@@ -51,7 +50,7 @@ instruments:
         step: 100
         display: ALT
         min_digits: 3
-        dataref: sim/cockpit2/autopilot/altitude_dial_ft
+        fonction: pa.altitude
       crs2:
         type: encoder
         inputs: [8, 9]
@@ -60,63 +59,55 @@ instruments:
         wrap: true
         display: CRS2
         leading_zeros: true
-        # la fenêtre COURSE de droite du 146 lit nav2_obs_degm (côté commandant) ; la valeur
-        # côté copilote, utilisée sur le 737, n'y arrive pas (vérifié le 2026-11-17)
-        dataref: sim/cockpit2/radios/actuators/nav2_obs_deg_mag_pilot
+        fonction: nav2.course          # côté commandant : la valeur copilote n'arrive pas au 146
 
       boutons:
         type: commands
         level: 0                      # poussoirs du MCP : 0 pendant l'appui
         inputs:
-          25: thranda/buttons/Button15     # HDG SEL → HDG
-          23: thranda/buttons/Button06     # VOR LOC → V/L
-          22: thranda/buttons/Button07     # APP     → GSL
-          21: thranda/buttons/Button08     # ALT HLD → ALT
-          20: thranda/buttons/Button11     # V/S     → VS
-          26: thranda/buttons/Button16     # LVL CHG → IAS
-          28: thranda/buttons/Button12     # SPEED   → MACH
-          24: thranda/buttons/Button14     # LNAV    → L NAV
-          27: thranda/buttons/Button13     # VNAV    → V NAV
-          29: thranda/buttons/Button10     # N1      → TURB
-          16: thranda/buttons/Button09     # CWS B   → B LOC
-          17: sim/autopilot/altitude_arm   # CWS A   → ALT ARM
-          19: thranda/buttons/Button61     # CMD A   → AP (console centrale)
-          18: thranda/buttons/Button60     # CMD B   → YD (console centrale)
+          25: pa.mode.hdg                  # HDG SEL
+          23: pa.mode.vl                   # VOR LOC
+          22: pa.mode.gsl                  # APP
+          21: pa.mode.alt                  # ALT HLD
+          20: pa.mode.vs                   # V/S
+          26: pa.mode.ias                  # LVL CHG
+          28: pa.mode.mach                 # SPEED
+          24: pa.mode.lnav                 # LNAV
+          27: pa.mode.vnav                 # VNAV
+          29: pa.mode.turb                 # N1
+          16: pa.mode.bloc                 # CWS B
+          17: pa.altitude_arm              # CWS A
+          19: pa.engage                    # CMD A (bouton AP de la console centrale)
+          18: amortisseur_lacet.engage     # CMD B (bouton YD de la console centrale)
 
       voyants:
         type: sim_leds
         leds:
-          HDG SEL: thranda/TCAS/AnnLtA[337]
-          VOR LOC: thranda/TCAS/AnnLtA[333]
-          APP: thranda/TCAS/AnnLtA[327]
-          ALT HLD: thranda/TCAS/AnnLtA[328]
-          V/S: thranda/TCAS/AnnLtA[329]
-          LVL CHG: thranda/TCAS/AnnLtA[332]
-          SPEED: thranda/TCAS/AnnLtA[330]
-          LNAV: thranda/TCAS/AnnLtA[336]
-          VNAV: thranda/TCAS/AnnLtA[331]
-          N1: thranda/TCAS/AnnLtA[335]
-          CWS B: thranda/TCAS/AnnLtA[334]
-          CWS A: thranda/TCAS/AnnLtA[338]
-          CMD A: thranda/TCAS/AnnLtA[326]   # triangle AP du glareshield
-          CMD B: thranda/TCAS/AnnLtA[351]   # YD 1
+          HDG SEL: pa.mode.hdg.voyant
+          VOR LOC: pa.mode.vl.voyant
+          APP: pa.mode.gsl.voyant
+          ALT HLD: pa.mode.alt.voyant
+          V/S: pa.mode.vs.voyant
+          LVL CHG: pa.mode.ias.voyant
+          SPEED: pa.mode.mach.voyant
+          LNAV: pa.mode.lnav.voyant
+          VNAV: pa.mode.vnav.voyant
+          N1: pa.mode.turb.voyant
+          CWS B: pa.mode.bloc.voyant
+          CWS A: pa.altitude_arm.voyant
+          CMD A: pa.engage.voyant
+          CMD B: amortisseur_lacet.engage.voyant
 
-      fd_gauche:                      # FD BARS commandant : Switch[92], 2 = ON
+      fd_gauche:
         type: switch
         input: 15
-        command_on: thranda/switches/SwitchUp92
-        command_off: thranda/switches/SwitchDn92
-        state_dataref: thranda/Switch[92]
-        state_on: 2
-      fd_droit:                       # FD BARS copilote : Switch[76], 2 = ON
+        fonction: fd.gauche
+      fd_droit:
         type: switch
         input: 13
-        command_on: thranda/switches/SwitchUp76
-        command_off: thranda/switches/SwitchDn76
-        state_dataref: thranda/Switch[76]
-        state_on: 2
+        fonction: fd.droit
       disengage:
         type: switch
         input: 14
         invert: true                  # « on » = barre baissée (entrée à 0)
-        command_on: sim/autopilot/servos_off_any
+        command_on: pa.deconnexion

@@ -80,6 +80,14 @@ class Engine:
                     if hasattr(ctrl, "on_key"):
                         ctrl.on_key(code, t)
 
+    def axis(self, card_id, index, value, t):
+        """Nouvelle position (0..1) d'un axe d'une carte (testable sans matériel)."""
+        for inst in self.cockpit.instruments.values():
+            if inst.card == card_id:
+                for ctrl in inst.controls.values():
+                    if hasattr(ctrl, "on_axis"):
+                        ctrl.on_axis(index, value, t)
+
     def poll(self, t):
         changes = []
         for inst in self.cockpit.instruments.values():
@@ -258,6 +266,8 @@ class Engine:
                 elif ev.kind == "state":
                     # horloge absolue : plusieurs cartes, une seule base de temps
                     self.feed(cid, ev.value, card.t0 + ev.t, card.type.active_level)
+                elif ev.kind == "axis":               # axe (manette des gaz…), 0..1
+                    self.axis(cid, ev.index, ev.value, card.t0 + ev.t)
                 elif ev.kind == "ready" and card.type.protocol == "fdbus":
                     self.bus_ready(cid, ev.value)
                 elif ev.kind == "init_failed":

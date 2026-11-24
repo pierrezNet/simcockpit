@@ -1,0 +1,120 @@
+# Dictionnaire des fonctions pour X-Plane 12 : datarefs et commandes standard, valables
+# pour tous les avions qui utilisent les systèmes standard d'X-Plane. Un avion qui a ses
+# propres boutons (BAe 146 de Thranda…) ajoute ou remplace des fonctions dans une section
+# « fonctions: » de son dossier (config/avions/<avion>/fonctions.yaml).
+#
+# Nom d'une fonction : <système>.<fonction>[.<détail>], en français, sans « / ».
+# Champs de branchement : dataref, valeurs (libellé → nombre), commande, commande_on,
+# commande_off, bascule, etat, etat_on, echelle. Documentation : description, unite,
+# verifie (date et avion où le branchement a été vérifié ; absent = pas encore vérifié).
+# Liste lisible : python -m simcockpit fonctions [dossier d'avion]
+
+fonctions:
+  # --- Transpondeur
+  transpondeur.code:
+    description: code transpondeur, 4 chiffres de 0 à 7 (« 2000 » → 2000)
+    dataref: sim/cockpit2/radios/actuators/transponder_code
+    verifie: 2026-11-14, Boeing 737-800 Laminar ; 2026-11-17, BAe 146 Just Flight
+  transpondeur.mode:
+    description: mode du transpondeur
+    dataref: sim/cockpit2/radios/actuators/transponder_mode
+    valeurs: {"OFF": 0, STBY: 1, "ON": 2, ALT: 3}
+    verifie: 2026-11-14, Boeing 737-800 Laminar (OFF, STBY, ON)
+
+  # --- Instruments
+  vitesse_verticale:
+    description: vitesse verticale indiquée (variomètre du commandant)
+    unite: ft/min
+    dataref: sim/cockpit2/gauges/indicators/vvi_fpm_pilot
+    verifie: 2026-11-17, BAe 146 Just Flight
+  volets.angle:
+    description: braquage réel des volets (aile gauche)
+    unite: °
+    dataref: sim/flightmodel2/wing/flap1_deg[0]
+    verifie: 2026-11-17, BAe 146 Just Flight (24° au cran 24)
+
+  # --- Consignes du pilote automatique
+  pa.cap:
+    description: consigne de cap (bouton HDG)
+    unite: °
+    dataref: sim/cockpit2/autopilot/heading_dial_deg_mag_pilot
+    verifie: 2026-11-14, Boeing 737-800 Laminar ; 2026-11-17, BAe 146 Just Flight
+  pa.altitude:
+    description: altitude affichée (ALT SEL)
+    unite: ft
+    dataref: sim/cockpit2/autopilot/altitude_dial_ft
+    verifie: 2026-11-14, Boeing 737-800 Laminar ; 2026-11-17, BAe 146 Just Flight
+  pa.vitesse:
+    description: consigne de vitesse (nœuds ou Mach selon pa.vitesse.en_mach)
+    dataref: sim/cockpit2/autopilot/airspeed_dial_kts_mach
+    verifie: 2026-11-14, Boeing 737-800 Laminar
+  pa.vitesse.en_mach:
+    description: consigne de vitesse en Mach (1) ou en nœuds (0)
+    dataref: sim/cockpit2/autopilot/airspeed_is_mach
+    verifie: 2026-11-14, Boeing 737-800 Laminar
+  pa.vitesse_verticale:
+    description: consigne de vitesse verticale
+    unite: ft/min
+    dataref: sim/cockpit2/autopilot/vvi_dial_fpm
+    verifie: 2026-11-14, Boeing 737-800 Laminar
+  pa.altitude_arm:
+    description: armement de la capture d'altitude (ALT ARM)
+    commande: sim/autopilot/altitude_arm
+    verifie: 2026-11-17, BAe 146 Just Flight
+  pa.deconnexion:
+    description: déconnexion du pilote automatique (bouton de la poignée)
+    commande: sim/autopilot/servos_off_any
+    verifie: 2026-11-17, BAe 146 Just Flight (relevé dans le cockpit 3D)
+
+  # --- Directeurs de vol, automanette
+  fd.gauche:
+    description: directeur de vol du commandant (interrupteur)
+    commande_on: sim/autopilot/fdir_command_bars_on
+    commande_off: sim/autopilot/fdir_command_bars_off
+    verifie: 2026-11-14, Boeing 737-800 Laminar
+  fd.droit:
+    description: directeur de vol du copilote (interrupteur)
+    commande_on: sim/autopilot/fdir2_command_bars_on
+    commande_off: sim/autopilot/fdir2_command_bars_off
+    verifie: 2026-11-14, Boeing 737-800 Laminar
+  automanette.armement:
+    description: armement de l'automanette (interrupteur A/T ARM)
+    commande_on: sim/autopilot/autothrottle_arm
+    commande_off: sim/autopilot/autothrottle_hard_off
+    verifie: 2026-11-14, Boeing 737-800 Laminar
+  automanette.armement.voyant:
+    description: automanette armée
+    dataref: sim/cockpit2/autopilot/autothrottle_arm
+    verifie: 2026-11-14, Boeing 737-800 Laminar
+
+  # --- Moteurs : poussée demandée par moteur, 0 (ralenti) à 1 (plein gaz). Les axes de
+  #     manette correspondants doivent être désaffectés dans les réglages joystick.
+  moteur1.manette:
+    description: poussée demandée au moteur 1
+    dataref: sim/cockpit2/engine/actuators/throttle_ratio[0]
+  moteur2.manette:
+    description: poussée demandée au moteur 2
+    dataref: sim/cockpit2/engine/actuators/throttle_ratio[1]
+  moteur3.manette:
+    description: poussée demandée au moteur 3
+    dataref: sim/cockpit2/engine/actuators/throttle_ratio[2]
+  moteur4.manette:
+    description: poussée demandée au moteur 4
+    dataref: sim/cockpit2/engine/actuators/throttle_ratio[3]
+
+  # --- Radionavigation
+  nav1.course:
+    description: course sélectionnée sur NAV1 (OBS)
+    unite: °
+    dataref: sim/cockpit2/radios/actuators/nav1_obs_deg_mag_pilot
+    verifie: 2026-11-14, Boeing 737-800 Laminar ; 2026-11-17, BAe 146 Just Flight
+  nav2.course:
+    description: course sélectionnée sur NAV2 (OBS), côté commandant
+    unite: °
+    dataref: sim/cockpit2/radios/actuators/nav2_obs_deg_mag_pilot
+    verifie: 2026-11-17, BAe 146 Just Flight
+  nav2.course.copilote:
+    description: course NAV2 côté copilote (CRS droit du 737)
+    unite: °
+    dataref: sim/cockpit2/radios/actuators/nav2_obs_deg_mag_copilot
+    verifie: 2026-11-14, Boeing 737-800 Laminar (sans effet sur le BAe 146)

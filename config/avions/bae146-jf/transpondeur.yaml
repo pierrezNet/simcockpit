@@ -2,7 +2,8 @@
 # standard d'X-Plane, que le BAe 146 de Just Flight utilise aussi.
 # Le boîtier tient des positions absolues : ses valeurs sont poussées vers X-Plane à chaque
 # changement et à la connexion.
-# Modes X-Plane : 0 off, 1 standby, 2 on, 3 alt (mode C).
+# Branchements X-Plane : fonctions transpondeur.code et transpondeur.mode du dictionnaire
+# (config/dictionnaire/xplane.yaml), qui traduit aussi les positions en modes X-Plane.
 
 instruments:
   transpondeur:
@@ -12,15 +13,11 @@ instruments:
       code:
         type: octal_digits    # 4 molettes, chacune codée en binaire sur 3 entrées (bit 0 en premier)
         inputs: [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]]
-        dataref: sim/cockpit2/radios/actuators/transponder_code
+        fonction: transpondeur.code
       mode:
         type: selector        # la 1re position active de la liste l'emporte
         positions:            # (en ON, le contact STBY reste aussi fermé)
           "ON": 12
           STBY: 13
         default: "OFF"        # aucune position active
-        dataref: sim/cockpit2/radios/actuators/transponder_mode
-        dataref_values:
-          "OFF": 0
-          STBY: 1
-          "ON": 2             # 3 pour le mode C (altitude)
+        fonction: transpondeur.mode   # mode C (ALT) : aucune position ne le donne encore
