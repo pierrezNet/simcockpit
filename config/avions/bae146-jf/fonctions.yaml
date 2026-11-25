@@ -110,3 +110,19 @@ fonctions:
   moteur4.manette:
     description: manette du moteur 4 (−0,1 OFF, 0 ralenti, 1 plein gaz)
     dataref: thranda/cockpit/Throttle[3]
+
+  # --- Carburant : 3 réservoirs (fichier de l'avion, JF_BAe_146_200.acf) : n° 0 à gauche
+  #     (x = −13 m) et n° 1 à droite (x = +13 m), 39 % de la capacité chacun ; n° 2 au
+  #     centre, 21 %. Capacité totale 20 640 lb (≈ 9 360 kg).
+  carburant.aile_gauche:
+    description: carburant de l'aile gauche
+    unite: kg
+    dataref: sim/flightmodel/weight/m_fuel[0]
+  carburant.aile_droite:
+    description: carburant de l'aile droite
+    unite: kg
+    dataref: sim/flightmodel/weight/m_fuel[1]
+  carburant.central:
+    description: carburant du réservoir central
+    unite: kg
+    dataref: sim/flightmodel/weight/m_fuel[2]

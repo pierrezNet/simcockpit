@@ -17,3 +17,7 @@ archives/
 .idea/
 *.swp
 .DS_Store
+
+# Identifiants wifi des cartes Arduino : jamais publiés (copier secrets.h.example)
+arduino/**/secrets.h
+arduino/**/.pio/

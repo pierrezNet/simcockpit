@@ -54,7 +54,7 @@ DATAREF_LIST_PARAMS = {"datarefs"}          # liste de datarefs (manette des gaz
 COMMAND_PARAMS = {"command_on", "command_off", "toggle_command"}
 # commandes dont un paramètre est un tableau {nom: commande ou dataref}
 TABLES = {"commands": ("inputs", "commande"), "keypad": ("keys", "commande"),
-          "sim_leds": ("leds", "dataref")}
+          "sim_leds": ("leds", "dataref"), "iocp_outputs": ("variables", "dataref")}
 
 
 class DictionaryError(ValueError):

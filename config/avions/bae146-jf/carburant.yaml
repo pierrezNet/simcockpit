@@ -1,0 +1,16 @@
+# Afficheur carburant : carte ESP8266 et écran OLED en wifi, écrite pour SIOC (protocole
+# IOCP). Elle se connecte au PC (port 8092) et demande les variables 201, 202 et 203 ;
+# simcockpit lui envoie la quantité de chaque réservoir du 146, en kg.
+# Programme de la carte : arduino/carburant_bae146/.
+
+instruments:
+  carburant:
+    label: Carburant (afficheur wifi)
+    card: arduino_carburant
+    controls:
+      afficheur:
+        type: iocp_outputs
+        variables:
+          201: carburant.aile_gauche    # LFT
+          202: carburant.aile_droite    # RGT
+          203: carburant.central        # CTR (le total est calculé par la carte)

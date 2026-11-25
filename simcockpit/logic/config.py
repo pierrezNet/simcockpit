@@ -30,6 +30,7 @@ class CardSpec:
     id: str
     product: str
     usb_port: str = None
+    tcp_port: int = None      # carte réseau IOCP : port d'écoute (8092 par défaut)
 
 
 @dataclass
@@ -127,7 +128,8 @@ def parse(data, calibrations=None):
         if spec.get("product") not in products:
             raise ConfigError(f"carte {cid} : produit {spec.get('product')!r} inconnu"
                               f" (connus : {sorted(products)})")
-        cards[cid] = CardSpec(cid, spec["product"], spec.get("usb_port"))
+        cards[cid] = CardSpec(cid, spec["product"], spec.get("usb_port"),
+                              int(spec["port"]) if spec.get("port") else None)
     dictionary = _dictionary(data)
     instruments = {}
     for iid, spec in (data.get("instruments") or {}).items():

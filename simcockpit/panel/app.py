@@ -19,6 +19,7 @@ from ..logic.controls import Encoder, OctalDigits, Selector, SpeedEncoder, Switc
 from ..logic.dme_indicator import DmeIndicator
 from ..logic.gauges import Gauge
 from ..logic.throttle import ThrottleAxis
+from ..logic.iocp_outputs import IocpOutputs
 from ..gui.fdbus_view import format_value
 from ..hw import usbfmc
 from ..logic.radio_panel import RadioPanel
@@ -579,6 +580,11 @@ class ControlWidget(QWidget):
             self.ind = QLabel("—")
             self.ind.setStyleSheet(POS_OFF)
             lay.addWidget(self.ind)
+        elif isinstance(ctrl, IocpOutputs):
+            self.lcd = QLabel(ctrl.summary())
+            self.lcd.setStyleSheet(LCD.replace("56px", "22px"))
+            self.lcd.setWordWrap(True)
+            lay.addWidget(self.lcd)
         elif isinstance(ctrl, ThrottleAxis):
             self.lcd = QLabel("— %")
             self.lcd.setStyleSheet(LCD.replace("56px", "34px"))
@@ -607,6 +613,8 @@ class ControlWidget(QWidget):
         elif isinstance(self.ctrl, Switch):
             self.ind.setText("ON" if value else "OFF")
             self.ind.setStyleSheet(POS_ON if value else POS_OFF)
+        elif isinstance(self.ctrl, IocpOutputs):
+            self.lcd.setText(self.ctrl.summary())
         elif isinstance(self.ctrl, ThrottleAxis) and self.ctrl.ratio is not None:
             c = self.ctrl
             self.lcd.setText(f"{c.ratio * 100:.0f} %")

@@ -102,6 +102,25 @@ fonctions:
     description: poussée demandée au moteur 4
     dataref: sim/cockpit2/engine/actuators/throttle_ratio[3]
 
+  # --- Carburant : quantité par réservoir, dans l'ordre des réservoirs de l'avion (un
+  #     avion donne aux siens des noms parlants dans son fonctions.yaml)
+  carburant.reservoir1:
+    description: carburant du réservoir n° 1 de l'avion
+    unite: kg
+    dataref: sim/flightmodel/weight/m_fuel[0]
+  carburant.reservoir2:
+    description: carburant du réservoir n° 2 de l'avion
+    unite: kg
+    dataref: sim/flightmodel/weight/m_fuel[1]
+  carburant.reservoir3:
+    description: carburant du réservoir n° 3 de l'avion
+    unite: kg
+    dataref: sim/flightmodel/weight/m_fuel[2]
+  carburant.total:
+    description: carburant total à bord
+    unite: kg
+    dataref: sim/flightmodel/weight/m_fuel_total
+
   # --- Radionavigation
   nav1.course:
     description: course sélectionnée sur NAV1 (OBS)

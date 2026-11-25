@@ -27,6 +27,7 @@ officiel d'OpenCockpits, qui ne fonctionne que sous Windows.
 | OpenCockpits CDU 737 | `USBFMC V1.0` | ✅ 70 touches | ✅ 5 voyants (OFST, MSG, EXEC, DSPY, FAIL) |
 | EFDE FDBUS (bus de jauges) | `FDBUS` | — | ✅ modules moteur X27 et analogique 12 V : position de l'aiguille |
 | Thrustmaster TCA Q-Eng 1&2 (manettes des gaz) | `TCA Q-Eng 1&2` | ✅ 2 manettes (axes lus par evdev, sans règle udev) | — |
+| Carte réseau IOCP (Arduino / ESP8266 écrit pour SIOC) | `IOCP` (wifi, port 8092) | — | ✅ variables IOCP (ex. afficheur carburant) |
 | OpenCockpits USB Expansion + Master Card | `IOCardUSB` | ✅ 72 entrées (la Master Card doit être alimentée) | ⚠️ codage connu, non testé |
 
 Une carte d'un de ces fabricants dont le modèle est inconnu est quand même détectée.
@@ -185,6 +186,7 @@ config/
         ├── cdu.yaml        # CDU → FMS du 146 (mêmes commandes que le 737)
         ├── fonctions.yaml  # fonctions propres au 146 (boutons et voyants Thranda)
         ├── jauges.yaml     # vitesse verticale et volets sur les jauges FDBUS
+        ├── carburant.yaml  # afficheur carburant wifi (IOCP) : réservoirs gauche, droit, central
         ├── manettes.yaml   # TQ à 2 manettes → moteurs 1-2 et 3-4
         ├── mcp.yaml        # MCP 737 → sélecteur de modes, AP et YD du 146
         ├── sim.yaml
@@ -288,6 +290,7 @@ instruments:
 | `commands` | poussoirs → commandes X-Plane (`inputs: {entrée: commande}`) | `inputs`, `level` |
 | `sim_leds` | voyants (MCP, CDU) qui suivent des datarefs X-Plane | `leds` |
 | `gauge` | jauge du bus FDBUS, désignée par le nom donné dans la fenêtre de test | `gauge`, `dataref`, `scale`, `rest` |
+| `iocp_outputs` | valeurs du simulateur envoyées aux variables IOCP d'une carte réseau | `variables` (`{201: fonction ou dataref}`), `echelle` |
 | `throttle_axis` | manette des gaz : un axe pilote la poussée d'un ou plusieurs moteurs (cran = ralenti) | `axis`, `datarefs`, `ralenti`, `plein_gaz`, `coupure`, `valeur_coupure` |
 | `rj_autopilot` | modes du pilote automatique de l'Avro RJ sur le MCP (voyants compris) | `buttons`, `fd_left`, `fd_right`, `at_arm`, `disengage` |
 
@@ -337,6 +340,14 @@ scripts (voir `config/avions/b738-laminar/mcp.yaml`).
   l'initialisation du bus, puis suit le simulateur ; sans X-Plane, elle revient sur la
   valeur de repos (`rest`, 0 par défaut) et le panneau propose une valeur d'essai. Un
   module absent ou d'un autre type que celui étalonné est signalé et ne reçoit rien.
+
+- **`iocp_outputs` :** pour une carte réseau écrite pour SIOC (Arduino, ESP8266). Une telle
+  carte se déclare dans `materiel.yaml` avec `product: IOCP` (et `port:` si ce n'est pas
+  8092). Le panneau ouvre alors un serveur IOCP ; la carte s'y connecte comme à SIOC,
+  annonce ses variables (`Arn.Inicio:201:202:`), puis reçoit leurs valeurs entières à
+  chaque changement (`Arn.Resp:201=3961:`). Le programme de l'afficheur carburant du 146
+  est dans `arduino/carburant_bae146/` ; ses identifiants wifi vont dans `secrets.h`, jamais
+  publié.
 
 - **`throttle_axis` :** la position de l'axe (0 à 1) devient une poussée entre deux repères :
   `ralenti` (poussée 0) et `plein_gaz` (poussée 1), dans un sens ou dans l'autre. Au-delà
@@ -458,9 +469,10 @@ type 0.
 ## Structure du projet
 
 ```
+arduino/            programmes des cartes Arduino / ESP8266 (identifiants wifi dans secrets.h, non publié)
 bin/                lanceurs : simcockpit-gui, cockpit-panel, simcockpit (ligne de commande)
 config/             configuration : matériel et un dossier par avion
-simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc, radio_airbus, fdbus)
+simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc, radio_airbus, fdbus, evdev, serveur IOCP)
 simcockpit/diag/    bruit, assistants de test des entrées et des sorties
 simcockpit/logic/   configuration, dictionnaire des fonctions, types de commandes (dont les jauges), moteur, atmosphère standard
 simcockpit/gui/     fenêtre de test des cartes

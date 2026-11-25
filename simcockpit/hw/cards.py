@@ -115,13 +115,24 @@ TCA_QENG = CardType(
     verified="axes 0 et 1 = manettes gauche et droite (0 = plein gaz), 2026-11-24",
 )
 
+IOCP = CardType(
+    key="iocp",
+    label="Carte réseau IOCP (Arduino / ESP8266 écrit pour SIOC)",
+    products=("IOCP",),
+    protocol="iocp",           # serveur TCP : la carte se connecte à nous (hw/iocp.py)
+    active_level=1,
+    inputs=0, outputs=0, axes=0,
+    init=False,
+    verified="protocole relu dans le programme de l'afficheur carburant ESP8266",
+)
+
 UNKNOWN = CardType(
     key="unknown", label="Carte inconnue", products=(), protocol="unknown",
     active_level=1, inputs=0, outputs=0, axes=0, send_init=False,
 )
 
 KNOWN = (MASTERCARD, EFDE_IO32, OC_MCP, EFDE_DME, OC_USBFMC, OC_RADIO_AIRBUS, EFDE_FDBUS,
-         TCA_QENG)
+         TCA_QENG, IOCP)
 
 
 def classify(product: str) -> CardType:

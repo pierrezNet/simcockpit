@@ -18,3 +18,6 @@ cards:
     product: FDBUS            # EFDE FDBUS (jauges : IVSI, volets) ; réglées dans config/fdbus.yaml
   tq:
     product: TCA Q-Eng 1&2    # Thrustmaster TCA Q-Eng 1&2 (manettes des gaz, lu par evdev)
+  arduino_carburant:
+    product: IOCP             # afficheur carburant ESP8266 en wifi : il se connecte à
+    port: 8092                # simcockpit comme à SIOC (protocole IOCP, port 8092)
