@@ -1,0 +1,77 @@
+# Carte des vitesses du BAe 146 sur l'écran à encre (LilyGo T5 4,7", wifi, IOCP).
+# Livret « BAe 146 Series 300, Non-Limiting Speed charts, 27000-46000 kg », tiré du
+# manuel de vol du 146-300, températures moyennes, vitesses en kt IAS ; atterrissage
+# normal volets 33° et 24°, anormal 30°, 18° et 0°.
+# Le livret a une page par masse, aux valeurs fixes ; simcockpit prend la page de la masse
+# immédiatement supérieure à celle de l'avion et l'envoie à l'écran (variables 210 à 223).
+# Une case absente d'une page vaut 0 : l'écran affiche un tiret.
+# Programme de l'écran : arduino/carte_vitesses_bae146/.
+#
+# Pour ajouter une page : recopier le bloc « 38000: » sous une autre masse et y mettre les
+# valeurs du livret. Pas besoin de reprogrammer l'écran.
+
+instruments:
+  carte_vitesses:
+    label: Carte des vitesses (écran à encre)
+    card: ecran_vitesses
+    controls:
+      livret:
+        type: iocp_lookup
+        source: masse.totale
+        choix: superieur          # page de la masse immédiatement supérieure
+        variables:
+          page: 210               # masse de la page (kg)
+          vr_18: 211              # décollage, volets 18°
+          v2_18: 212
+          vr_24: 213              # décollage, volets 24°
+          v2_24: 214
+          vr_30: 215              # décollage, volets 30°
+          v2_30: 216
+          vfto: 217
+          ver: 218
+          vref_33: 219            # atterrissage
+          vref_30: 220
+          vref_24: 221
+          vref_18: 222
+          vref_0: 223
+        pages:                    # livret 146-300, saisi le 2026-11-25
+          27000: {vr_18: 104, vr_24: 96, vr_30: 90, v2_18: 115, v2_24: 106, v2_30: 100,
+                  vfto: 147, ver: 157, vref_33: 100, vref_24: 114, vref_30: 106, vref_18: 125, vref_0: 155}
+          28000: {vr_18: 106, vr_24: 98, vr_30: 90, v2_18: 117, v2_24: 107, v2_30: 100,
+                  vfto: 151, ver: 161, vref_33: 102, vref_24: 116, vref_30: 108, vref_18: 127, vref_0: 158}
+          29000: {vr_18: 108, vr_24: 100, vr_30: 92, v2_18: 119, v2_24: 109, v2_30: 101,
+                  vfto: 154, ver: 164, vref_33: 104, vref_24: 117, vref_30: 109, vref_18: 128, vref_0: 160}
+          30000: {vr_18: 111, vr_24: 102, vr_30: 94, v2_18: 120, v2_24: 110, v2_30: 103,
+                  vfto: 157, ver: 167, vref_33: 106, vref_24: 119, vref_30: 111, vref_18: 130, vref_0: 163}
+          31000: {vr_18: 113, vr_24: 104, vr_30: 96, v2_18: 122, v2_24: 112, v2_30: 105,
+                  vfto: 159, ver: 169, vref_33: 108, vref_24: 121, vref_30: 113, vref_18: 132, vref_0: 166}
+          32000: {vr_18: 115, vr_24: 106, vr_30: 98, v2_18: 124, v2_24: 114, v2_30: 106,
+                  vfto: 162, ver: 172, vref_33: 109, vref_24: 122, vref_30: 115, vref_18: 134, vref_0: 168}
+          33000: {vr_18: 117, vr_24: 108, vr_30: 100, v2_18: 125, v2_24: 115, v2_30: 108,
+                  vfto: 165, ver: 175, vref_33: 111, vref_24: 124, vref_30: 116, vref_18: 135, vref_0: 171}
+          34000: {vr_18: 120, vr_24: 110, vr_30: 102, v2_18: 127, v2_24: 117, v2_30: 109,
+                  vfto: 167, ver: 177, vref_33: 113, vref_24: 126, vref_30: 118, vref_18: 137, vref_0: 173}
+          35000: {vr_18: 122, vr_24: 112, vr_30: 104, v2_18: 129, v2_24: 118, v2_30: 111,
+                  vfto: 170, ver: 180, vref_33: 115, vref_24: 128, vref_30: 120, vref_18: 139, vref_0: 176}
+          36000: {vr_18: 124, vr_24: 114, vr_30: 106, v2_18: 131, v2_24: 120, v2_30: 113,
+                  vfto: 172, ver: 182, vref_33: 116, vref_24: 129, vref_30: 121, vref_18: 140, vref_0: 178}
+          37000: {vr_18: 126, vr_24: 116, vr_30: 108, v2_18: 132, v2_24: 122, v2_30: 114,
+                  vfto: 174, ver: 184, vref_33: 118, vref_24: 131, vref_30: 123, vref_18: 142, vref_0: 181}
+          38000: {vr_18: 128, vr_24: 118, vr_30: 109, v2_18: 134, v2_24: 123, v2_30: 116,
+                  vfto: 177, ver: 187, vref_33: 119, vref_24: 132, vref_30: 124, vref_18: 143, vref_0: 183}
+          39000: {vr_18: 130, vr_24: 120, vr_30: 111, v2_18: 136, v2_24: 125, v2_30: 117,
+                  vfto: 179, ver: 189, vref_33: 121, vref_24: 134, vref_30: 126, vref_18: 145, vref_0: 186}
+          40000: {vr_18: 132, vr_24: 122, vr_30: 113, v2_18: 137, v2_24: 127, v2_30: 119,
+                  vfto: 181, ver: 191, vref_33: 123, vref_24: 136, vref_30: 128, vref_18: 147, vref_0: 188}
+          41000: {vr_18: 134, vr_24: 124, vr_30: 115, v2_18: 138, v2_24: 128, v2_30: 121,
+                  vfto: 184, ver: 194, vref_33: 124, vref_24: 137, vref_30: 129, vref_18: 148, vref_0: 190}
+          42000: {vr_18: 136, vr_24: 126, vr_30: 117, v2_18: 140, v2_24: 130, v2_30: 122,
+                  vfto: 186, ver: 196, vref_33: 125, vref_24: 139, vref_30: 131, vref_18: 149, vref_0: 193}
+          43000: {vr_18: 137, vr_24: 127, vr_30: 118, v2_18: 142, v2_24: 132, v2_30: 124,
+                  vfto: 188, ver: 198, vref_33: 127, vref_24: 140, vref_30: 132, vref_18: 151, vref_0: 195}
+          44000: {vr_18: 139, vr_24: 129, vr_30: 120, v2_18: 144, v2_24: 133, v2_30: 125,
+                  vfto: 191, ver: 201, vref_33: 128, vref_24: 142, vref_30: 133, vref_18: 152, vref_0: 198}
+          45000: {vr_18: 141, vr_24: 131, vr_30: 122, v2_18: 146, v2_24: 135, v2_30: 127,
+                  vfto: 193, ver: 203, vref_33: 130, vref_24: 143, vref_30: 135, vref_18: 154, vref_0: 200}
+          46000: {vr_18: 143, vr_24: 132, vr_30: 124, v2_18: 147, v2_24: 136, v2_30: 128,
+                  vfto: 195, ver: 205, vref_33: 131, vref_24: 144, vref_30: 136, vref_18: 156, vref_0: 203}

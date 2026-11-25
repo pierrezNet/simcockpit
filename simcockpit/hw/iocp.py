@@ -84,6 +84,12 @@ class IocpServer:
         with self._lock:
             return [f"{c.addr[0]}" for c in self._clients]
 
+    def clients_for(self, variables):
+        """Adresses des cartes connectées qui ont demandé au moins une de ces variables."""
+        wanted = set(variables)
+        with self._lock:
+            return [c.addr[0] for c in self._clients if c.wanted & wanted]
+
     def start(self):
         self._listener = socket.create_server((self.host, self.port), reuse_port=False)
         self._listener.setblocking(False)

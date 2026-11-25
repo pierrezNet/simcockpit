@@ -102,6 +102,13 @@ fonctions:
     description: poussée demandée au moteur 4
     dataref: sim/cockpit2/engine/actuators/throttle_ratio[3]
 
+  # --- Masse
+  masse.totale:
+    description: masse totale de l'avion (à vide, carburant et charge)
+    unite: kg
+    dataref: sim/flightmodel/weight/m_total
+    verifie: 2026-11-25, BAe 146 Just Flight (37 808 kg, carte de vitesses à 38 000 kg)
+
   # --- Carburant : quantité par réservoir, dans l'ordre des réservoirs de l'avion (un
   #     avion donne aux siens des noms parlants dans son fonctions.yaml)
   carburant.reservoir1:

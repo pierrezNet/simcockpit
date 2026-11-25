@@ -187,6 +187,7 @@ config/
         ├── fonctions.yaml  # fonctions propres au 146 (boutons et voyants Thranda)
         ├── jauges.yaml     # vitesse verticale et volets sur les jauges FDBUS
         ├── carburant.yaml  # afficheur carburant wifi (IOCP) : réservoirs gauche, droit, central
+        ├── carte_vitesses.yaml  # carte des vitesses (livret par masse) sur l'écran à encre wifi
         ├── manettes.yaml   # TQ à 2 manettes → moteurs 1-2 et 3-4
         ├── mcp.yaml        # MCP 737 → sélecteur de modes, AP et YD du 146
         ├── sim.yaml
@@ -291,6 +292,7 @@ instruments:
 | `sim_leds` | voyants (MCP, CDU) qui suivent des datarefs X-Plane | `leds` |
 | `gauge` | jauge du bus FDBUS, désignée par le nom donné dans la fenêtre de test | `gauge`, `dataref`, `scale`, `rest` |
 | `iocp_outputs` | valeurs du simulateur envoyées aux variables IOCP d'une carte réseau | `variables` (`{201: fonction ou dataref}`), `echelle` |
+| `iocp_lookup` | page d'un livret (une page par masse…) choisie selon une valeur du simulateur, envoyée à une carte IOCP | `source`, `choix` (`superieur`, `proche`), `variables`, `pages` |
 | `throttle_axis` | manette des gaz : un axe pilote la poussée d'un ou plusieurs moteurs (cran = ralenti) | `axis`, `datarefs`, `ralenti`, `plein_gaz`, `coupure`, `valeur_coupure` |
 | `rj_autopilot` | modes du pilote automatique de l'Avro RJ sur le MCP (voyants compris) | `buttons`, `fd_left`, `fd_right`, `at_arm`, `disengage` |
 
@@ -348,6 +350,13 @@ scripts (voir `config/avions/b738-laminar/mcp.yaml`).
   chaque changement (`Arn.Resp:201=3961:`). Le programme de l'afficheur carburant du 146
   est dans `arduino/carburant_bae146/` ; ses identifiants wifi vont dans `secrets.h`, jamais
   publié.
+
+- **`iocp_lookup` :** un livret à une page par masse (carte des vitesses du BAe 146). La page
+  est celle de la masse immédiatement supérieure à celle de l'avion (`choix: superieur`) ou
+  la plus proche ; chaque case part sur sa variable IOCP, une case absente vaut 0. Ajouter
+  une page du livret ne demande que le YAML : l'écran (`arduino/carte_vitesses_bae146/`,
+  LilyGo T5 4,7" à la verticale) ne fait que dessiner. Plusieurs cartes IOCP peuvent partager
+  le même port : chacune reçoit les variables qu'elle demande.
 
 - **`throttle_axis` :** la position de l'axe (0 à 1) devient une poussée entre deux repères :
   `ralenti` (poussée 0) et `plein_gaz` (poussée 1), dans un sens ou dans l'autre. Au-delà

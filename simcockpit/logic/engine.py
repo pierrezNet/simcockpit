@@ -38,7 +38,8 @@ class Engine:
     def __init__(self, cockpit):
         self.cockpit = cockpit
         self.cards = {}            # id -> Card (connectées)
-        self.servers = {}          # id -> serveur IOCP (cartes réseau qui se connectent à nous)
+        self.servers = {}          # port -> serveur IOCP, partagé par les cartes réseau de ce port
+        self._iocp_port = {}       # id de carte IOCP -> port
         self.status = {cid: "non trouvée" for cid in cockpit.cards}
         # état des sorties par carte (seul le protocole MCP est géré pour l'instant)
         makers = {"mcp": mcp.McpOutputs, "radio_airbus": radio_airbus.RadioOutputs,
@@ -261,17 +262,20 @@ class Engine:
         """Carte réseau IOCP : on ouvre le serveur ; la carte se connecte quand elle veut."""
         from ..hw.iocp import DEFAULT_PORT, IocpServer
         port = spec.tcp_port or DEFAULT_PORT
-        server = self.servers.get(cid)
-        if server is None:
+        server = self.servers.get(port)          # plusieurs cartes peuvent partager un port :
+        if server is None:                       # chacune reçoit les variables qu'elle demande
             try:
-                server = self.servers[cid] = IocpServer(port).start()
+                server = self.servers[port] = IocpServer(port).start()
             except OSError as e:
                 self.status[cid] = f"erreur : port {port} indisponible ({e})"
                 return
+        if cid not in self._iocp_port:
+            self._iocp_port[cid] = port
             for ctrl in self._card_controls(cid):          # tout renvoyer au démarrage
                 if hasattr(ctrl, "take_values"):
                     server.set_values(dict(ctrl.values))
-        clients = server.clients
+        variables = {v for ctrl in self._card_controls(cid) for v in getattr(ctrl, "variables", ())}
+        clients = server.clients_for(variables)
         self.status[cid] = (f"connectée (port {port}, carte {', '.join(clients)})" if clients
                             else f"en attente de la carte (serveur IOCP, port {port})")
 
@@ -282,7 +286,8 @@ class Engine:
 
     def push_iocp(self):
         """Valeurs changées des commandes IOCP → serveur de leur carte."""
-        for cid, server in self.servers.items():
+        for cid, port in self._iocp_port.items():
+            server = self.servers[port]
             for ctrl in self._card_controls(cid):
                 take = getattr(ctrl, "take_values", None)
                 if take is not None:
@@ -341,6 +346,7 @@ class Engine:
         for server in self.servers.values():
             server.stop()
         self.servers.clear()
+        self._iocp_port.clear()
         if self.sim is not None:
             self.sim.close()
             self.sim = None

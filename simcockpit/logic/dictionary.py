@@ -49,7 +49,7 @@ BINDING_FIELDS = set(FIELD_TO_PARAM) | {"commande"}
 DOC_FIELDS = {"description", "unite", "verifie"}
 
 # paramètres qui attendent un dataref ou une commande : un nom logique y est résolu
-DATAREF_PARAMS = {"dataref", "state_dataref", "mach_dataref", "blank_unless"}
+DATAREF_PARAMS = {"dataref", "state_dataref", "mach_dataref", "blank_unless", "source"}
 DATAREF_LIST_PARAMS = {"datarefs"}          # liste de datarefs (manette des gaz → moteurs)
 COMMAND_PARAMS = {"command_on", "command_off", "toggle_command"}
 # commandes dont un paramètre est un tableau {nom: commande ou dataref}

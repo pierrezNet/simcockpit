@@ -7,3 +7,5 @@ KERNEL=="hidraw*", ATTRS{manufacturer}=="Manuel Velez*", MODE="0660", GROUP="plu
 KERNEL=="hidraw*", ATTRS{manufacturer}=="EFDE*", MODE="0660", GROUP="plugdev"
 KERNEL=="hidraw*", ATTRS{manufacturer}=="E.F.D.E.*", MODE="0660", GROUP="plugdev"
 KERNEL=="hidraw*", ATTRS{manufacturer}=="Opencockpits*", MODE="0660", GROUP="plugdev"
+# Saitek Pro Flight B.I.P. (panneau de 24 voyants) : identifiant USB fiable 06a3:0b4e
+KERNEL=="hidraw*", ATTRS{idVendor}=="06a3", ATTRS{idProduct}=="0b4e", MODE="0660", GROUP="plugdev"

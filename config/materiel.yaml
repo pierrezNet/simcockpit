@@ -21,3 +21,6 @@ cards:
   arduino_carburant:
     product: IOCP             # afficheur carburant ESP8266 en wifi : il se connecte à
     port: 8092                # simcockpit comme à SIOC (protocole IOCP, port 8092)
+  ecran_vitesses:
+    product: IOCP             # écran à encre LilyGo T5 4,7" en wifi (carte des vitesses),
+    port: 8092                # même serveur IOCP que l'afficheur carburant

@@ -460,8 +460,9 @@ def make(name, spec):
     from .ufmc_screen import UfmcScreen
     from .throttle import ThrottleAxis
     from .iocp_outputs import IocpOutputs
+    from .iocp_lookup import IocpLookup
     for cls in (DmeIndicator, RjAutopilot, Commands, Keypad, SimLeds, RadioPanel, CduScreen, Gauge,
-                UfmcScreen, ThrottleAxis, IocpOutputs):
+                UfmcScreen, ThrottleAxis, IocpOutputs, IocpLookup):
         TYPES.setdefault(cls.type, cls)
     spec = dict(spec)
     kind = spec.pop("type", None)

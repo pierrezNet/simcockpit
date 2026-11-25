@@ -80,3 +80,51 @@ class TestProfil(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLivret(unittest.TestCase):
+    """Carte des vitesses du BAe 146 : une page par masse, page de la masse supérieure."""
+
+    def lookup(self, **kw):
+        from simcockpit.logic.iocp_lookup import IocpLookup
+        return IocpLookup("livret", source="sim/m", variables={"page": 210, "vr": 211, "v2": 212},
+                          pages={36000: {"vr": 120, "v2": 128}, 38000: {"vr": 125}}, **kw)
+
+    def test_page_superieure_et_case_absente(self):
+        l = self.lookup()
+        l.on_sim("sim/m", 37808.1, 1.0)
+        self.assertEqual(l.take_values(), {210: 38000, 211: 125, 212: 0})   # V2 absente : 0
+        l.on_sim("sim/m", 37900, 2.0)                    # même page : rien à envoyer
+        self.assertEqual(l.take_values(), {})
+        l.on_sim("sim/m", 35000, 3.0)
+        self.assertEqual(l.take_values(), {210: 36000, 211: 120, 212: 128})
+        l.on_sim("sim/m", 45000, 4.0)                    # au-delà du livret : dernière page
+        self.assertEqual(l.page, 38000)
+
+    def test_page_la_plus_proche(self):
+        l = self.lookup(choix="proche")
+        l.on_sim("sim/m", 36500, 1.0)
+        self.assertEqual(l.page, 36000)
+
+    def test_profil_bae146(self):
+        eng = Engine(config.load("config/avions/bae146-jf"))
+        carte = eng.cockpit.instruments["carte_vitesses"].controls["livret"]
+        self.assertEqual(carte.source, "sim/flightmodel/weight/m_total")
+        eng.sim_step({"sim/flightmodel/weight/m_total": 37808.1}, True, 1.0)
+        values = carte.take_values()
+        self.assertEqual((values[210], values[211], values[212], values[223]), (38000, 128, 134, 183))
+
+
+class TestPortPartage(unittest.TestCase):
+    def test_deux_cartes_un_serveur(self):
+        from simcockpit.logic.config import CardSpec
+        eng = Engine(config.load("config/avions/bae146-jf"))
+        spec = CardSpec("x", "IOCP", None, 0)            # port 0 : libre, choisi par le système
+        try:
+            eng._serve_iocp("arduino_carburant", spec)
+            eng._serve_iocp("ecran_vitesses", spec)
+            self.assertEqual(len(eng.servers), 1)
+            self.assertEqual(set(eng._iocp_port), {"arduino_carburant", "ecran_vitesses"})
+            self.assertIn("en attente", eng.status["ecran_vitesses"])
+        finally:
+            eng.close()
