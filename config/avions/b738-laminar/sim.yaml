@@ -5,3 +5,4 @@ sim:
   type: xplane
   host: 127.0.0.1
   port: 49000
+  avion: B738  # chargé dans X-Plane → ce profil

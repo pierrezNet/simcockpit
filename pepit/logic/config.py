@@ -13,6 +13,7 @@ dictionnaire du simulateur (config/dictionnaire/xplane.yaml) complété par les 
 """
 
 import os
+import re
 from dataclasses import dataclass, field
 
 import yaml
@@ -192,8 +193,20 @@ def parse(data, calibrations=None):
             raise ConfigError("sim : seul « type: xplane » est pris en charge")
         sim = {"type": "xplane", "host": sim.get("host", "127.0.0.1"),
                "port": int(sim.get("port", 49000)),
-               "web_port": int(sim.get("web_port", 8086))}     # API web (X-Plane 12.1.1+)
+               "web_port": int(sim.get("web_port", 8086)),     # API web (X-Plane 12.1.1+)
+               "aircraft": aircraft_codes(sim.get("avion"))}   # profil choisi selon l'avion
     return Cockpit(cards, instruments, sim, dictionary)
+
+
+def aircraft_codes(value):
+    """`avion: B462` ou `avion: [B461, B462]` → ("B462",) : codes OACI de l'avion du profil."""
+    if value is None:
+        return ()
+    codes = [value] if isinstance(value, str) else value
+    if not isinstance(codes, (list, tuple)) or not all(
+            isinstance(c, str) and re.fullmatch(r"[A-Za-z0-9]{2,4}", c) for c in codes):
+        raise ConfigError(f"sim.avion : code(s) OACI attendu(s) (ex. B462), pas {value!r}")
+    return tuple(c.upper() for c in codes)
 
 
 def _dictionary(data):

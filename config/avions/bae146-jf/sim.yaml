@@ -7,3 +7,4 @@ sim:
   type: xplane
   host: 127.0.0.1
   port: 49000
+  avion: [B461, B462, B463]  # 146-100, -200, -300 : même cockpit chez Just Flight

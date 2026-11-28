@@ -3,12 +3,13 @@
 Lancement : .venv/bin/python -m pepit.panel [config/avions/rj85-simule | dossier d'avion | fichier .yaml]
 """
 
+import os
 import sys
 import time
 
-from PySide6.QtCore import QRectF, Qt, QTimer
+from PySide6.QtCore import QRectF, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QMainWindow,
                                QPushButton, QScrollArea, QSpinBox, QTabWidget, QVBoxLayout,
                                QWidget)
@@ -32,6 +33,8 @@ from ..logic.rj_autopilot import RjAutopilot
 from ..gui.qtenv import prepare
 from ..gui.winstate import remember
 from ..logic.engine import Engine
+from ..logic import profiles
+from ..sim import launcher
 
 LCD = ("background:#111; color:#ffb000; font-family:monospace; font-size:56px;"
        " font-weight:bold; padding:6px 18px; border:2px solid #444; border-radius:6px;")
@@ -628,26 +631,53 @@ class ControlWidget(QWidget):
 
 
 class PanelWindow(QMainWindow):
+    # profil changé (choix dans la liste, avion chargé, autre lanceur) : chemin du dossier
+    profile_changed = Signal(str)
+
     def __init__(self, path, hub=None):
         super().__init__()
         self.path = path
         self.hub = hub            # cartes partagées avec le banc (None : le moteur ouvre les siennes)
         self.engine = None
         self.widgets = {}
+        self.settings = QSettings("pepit", "app")
+        self._aircraft = ""       # dernier avion vu dans X-Plane (choix automatique du profil)
+        self._xplane = None       # X-Plane lancé par Pepit (processus)
         self.setWindowTitle(f"Pepit — simulateur ({path})")
         remember(self, "cockpit_virtuel", (1200, 700))   # position et taille mémorisées
 
         central = QWidget()
         self.root = QVBoxLayout(central)
-        bar = QHBoxLayout()
+        tools = QHBoxLayout()
+        tools.addWidget(QLabel("Profil :"))
+        self.profile_box = QComboBox()
+        self.profile_box.setToolTip("Dossier de config/avions/ : cartes, instruments et liaison"
+                                    " de cet avion")
+        self.profile_box.activated.connect(self._profile_chosen)
+        tools.addWidget(self.profile_box)
+        self.auto = QCheckBox("Selon l'avion chargé dans X-Plane")
+        self.auto.setToolTip("Quand X-Plane charge un autre avion, prendre le profil qui le"
+                             " déclare (sim.yaml : « avion: B462 »).")
+        self.auto.setChecked(self.settings.value("simulateur/profil_auto", True, bool))
+        self.auto.toggled.connect(lambda on: self.settings.setValue("simulateur/profil_auto", on))
+        tools.addWidget(self.auto)
+        tools.addStretch()
+        self.xplane_btn = QPushButton("Lancer X-Plane")
+        self.xplane_btn.clicked.connect(self.launch_xplane)
+        tools.addWidget(self.xplane_btn)
+        pick = QPushButton("…")
+        pick.setFixedWidth(30)
+        pick.setToolTip("Choisir l'exécutable d'X-Plane")
+        pick.clicked.connect(self._pick_xplane)
+        tools.addWidget(pick)
+        reload_btn = QPushButton("Recharger la configuration")
+        reload_btn.clicked.connect(self.load)
+        tools.addWidget(reload_btn)
+        self.root.addLayout(tools)
         self.cards_label = QLabel()
         self.cards_label.setTextFormat(Qt.RichText)
         self.cards_label.setWordWrap(True)
-        reload_btn = QPushButton("Recharger la configuration")
-        reload_btn.clicked.connect(self.load)
-        bar.addWidget(self.cards_label, 1)
-        bar.addWidget(reload_btn)
-        self.root.addLayout(bar)
+        self.root.addWidget(self.cards_label)
         self.tabs = QTabWidget()          # un onglet par instrument
         self.root.addWidget(self.tabs, 1)
         self.root.addWidget(QLabel("Journal de la logique métier"))
@@ -658,13 +688,106 @@ class PanelWindow(QMainWindow):
 
         self.tick = QTimer(self, interval=20, timeout=self._step)
         self.retry = QTimer(self, interval=2000, timeout=self._connect)
+        self.watch = QTimer(self, interval=2000, timeout=self._watch_xplane)
+        self._fill_profiles()
+        self._watch_xplane()
+        self.watch.start()
         self.load()
+
+    # ------------------------------------------------------------ profils
+    def _fill_profiles(self):
+        self.profiles = profiles.list_profiles()
+        self.profile_box.clear()
+        for p in self.profiles:
+            planes = f"  ({', '.join(p.aircraft)})" if p.aircraft else ""
+            self.profile_box.addItem(p.name + planes, p.path)
+        self._sync_box()
+
+    def _sync_box(self):
+        for i, p in enumerate(self.profiles):
+            if profiles.same(p.path, self.path):
+                self.profile_box.setCurrentIndex(i)
+                return
+        self.profile_box.addItem(self.path, self.path)          # dossier hors de config/avions
+        self.profile_box.setCurrentIndex(self.profile_box.count() - 1)
+
+    def _profile_chosen(self, index):
+        path = self.profile_box.itemData(index)
+        if path and not profiles.same(path, self.path):
+            self.set_profile(path)
 
     def set_profile(self, path):
         """Change de profil d'avion (dossier de config/avions/) et le recharge."""
         self.path = path
         self.setWindowTitle(f"Pepit — simulateur ({path})")
+        self._sync_box()
         self.load()
+        self.profile_changed.emit(path)
+
+    def _follow_aircraft(self):
+        """X-Plane a chargé un autre avion : prendre son profil, s'il y en a un.
+        Vrai si le profil a changé."""
+        plane = self.engine.aircraft if self.engine else ""
+        if not plane or plane == self._aircraft:
+            return False              # rien de reçu (moteur rechargé, X-Plane absent) ou inchangé
+        self._aircraft = plane
+        if not self.auto.isChecked():
+            return False
+        target = profiles.profile_for(plane, self.profiles)
+        if target is None:
+            self._log(f"avion {plane} : aucun profil ne le déclare (sim.yaml, « avion: »),"
+                      " profil inchangé")
+        elif not profiles.same(target.path, self.path):
+            self._log(f"avion {plane} chargé dans X-Plane : profil {target.name}")
+            self.set_profile(target.path)
+            return True
+        return False
+
+    # ------------------------------------------------------------ X-Plane
+    def xplane_path(self):
+        return self.settings.value("xplane", "") or launcher.find()
+
+    def _watch_xplane(self):
+        if self._xplane is not None and self._xplane.poll() is not None:
+            self._xplane = None                    # X-Plane lancé par Pepit puis quitté
+        path = self.xplane_path()
+        if launcher.running(path) or (self.engine and self.engine.sim_connected):
+            self.xplane_btn.setText("X-Plane est lancé")
+            self.xplane_btn.setEnabled(False)
+            self.xplane_btn.setToolTip(path)
+        elif not launcher.usable(path):
+            self.xplane_btn.setText("Lancer X-Plane")
+            self.xplane_btn.setEnabled(False)
+            self.xplane_btn.setToolTip("X-Plane introuvable : choisissez son exécutable (« … »)")
+        else:
+            self.xplane_btn.setText("Lancer X-Plane")
+            self.xplane_btn.setEnabled(True)
+            self.xplane_btn.setToolTip(path)
+
+    def launch_xplane(self):
+        path = self.xplane_path()
+        if launcher.running(path):
+            self._log("X-Plane tourne déjà")
+            return
+        try:
+            self._xplane = launcher.launch(path)
+        except OSError as e:
+            self._log(f"X-Plane : impossible de le lancer ({e})")
+            return
+        self._log(f"X-Plane lancé ({path}) ; la liaison se fera quand il aura fini de charger")
+        self._watch_xplane()
+
+    def _pick_xplane(self):
+        start = self.xplane_path() or launcher.CANDIDATES[0]
+        path, _ = QFileDialog.getOpenFileName(self, "Exécutable d'X-Plane",
+                                              os.path.expanduser(start))
+        if path:
+            if not launcher.usable(path):
+                self._log(f"{path} n'est pas un exécutable")
+                return
+            self.settings.setValue("xplane", path)
+            self._log(f"X-Plane : {path}")
+            self._watch_xplane()
 
     def _clear_body(self):
         current = self.tabs.tabText(self.tabs.currentIndex()) if self.tabs.count() else None
@@ -760,6 +883,9 @@ class PanelWindow(QMainWindow):
         if self.engine.sim_connected != was:
             self._log("X-Plane " + ("connecté" if self.engine.sim_connected else "perdu"))
             self._show_status()
+            self._watch_xplane()
+        if self.engine.sim_connected and self._follow_aircraft():
+            return                                    # profil changé : moteur et vues recréés
             for w in self.widgets.values():           # données simulées inutiles avec X-Plane
                 if hasattr(w, "sim_group"):
                     w.sim_group.setEnabled(not self.engine.sim_connected)

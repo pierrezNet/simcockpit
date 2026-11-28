@@ -23,6 +23,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 from ..gui.peripheriques import PeripheriquesPage, UsbWatcher
 from ..gui.qtenv import prepare
 from ..hw.hub import DeviceHub
+from ..logic.profiles import same as same_profile
 from . import instance
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -83,6 +84,7 @@ class Pepit(QObject):
             if name == "simulateur":
                 from ..panel.app import PanelWindow
                 window = PanelWindow(self.profile, self.hub)
+                window.profile_changed.connect(self._remember_profile)
                 settings().setValue("profil", self.profile)
             elif name == "cartes":
                 from ..gui.app import MainWindow
@@ -95,14 +97,19 @@ class Pepit(QObject):
 
     def show(self, name, profile=None):
         window = self.page(name)
-        if name == "simulateur" and profile and profile != window.path:
-            self.profile = profile
-            settings().setValue("profil", profile)
-            window.set_profile(profile)
+        if name == "simulateur" and profile and not same_profile(profile, window.path):
+            window.set_profile(profile)              # → _remember_profile
         window.show()
         window.setWindowState(window.windowState() & ~Qt.WindowMinimized)
         window.raise_()
         window.activateWindow()
+
+    def _remember_profile(self, path):
+        self.profile = path
+        settings().setValue("profil", path)
+
+    def launch_xplane(self):
+        self.page("simulateur").launch_xplane()
 
     def on_message(self, line):
         """Message d'un autre lanceur : « afficher<TAB>page[<TAB>profil] »."""
@@ -135,6 +142,10 @@ class Pepit(QObject):
             action = QAction(label, menu)
             action.triggered.connect(lambda _=False, n=name: self.show(n))
             menu.addAction(action)
+        menu.addSeparator()
+        xplane = QAction("Lancer X-Plane", menu)
+        xplane.triggered.connect(self.launch_xplane)
+        menu.addAction(xplane)
         menu.addSeparator()
         quit_action = QAction("Quitter Pepit", menu)
         quit_action.triggered.connect(self.quit)
