@@ -4,9 +4,11 @@
 bin/pepit-peripheriques
 ```
 
-La page Périphériques montre tout ce qui est branché en USB : où, depuis quand, et si Pepit peut s'en servir. Elle sert à comprendre pourquoi une carte n'apparaît pas, et à lui ouvrir l'accès d'un clic.
+La page Périphériques montre tout ce qui est branché en USB ou connecté en wifi : où, depuis quand, et si Pepit peut s'en servir. Elle sert à comprendre pourquoi une carte n'apparaît pas, et à lui ouvrir l'accès d'un clic.
 
-## Le tableau
+Deux onglets : **USB** et **Wifi (IOCP)**.
+
+## L'onglet USB
 
 Une ligne par périphérique déjà vu, les branchés en tête (matériel de simulation d'abord), les débranchés grisés :
 
@@ -27,6 +29,21 @@ L'accès ne porte que sur les nœuds dont Pepit se sert : une manette Thrustmast
 
 En bas, le **journal** note chaque branchement, débranchement et changement d'accès depuis le lancement de Pepit.
 
+## L'onglet Wifi (IOCP)
+
+Une ligne par [carte wifi](../materiel/cartes-wifi.md) déjà connectée au cockpit :
+
+| Colonne | Contenu |
+|---|---|
+| pastille | **vert** connectée et déclarée par le profil chargé, **orange** connectée mais le profil ne la déclare pas, **gris** déconnectée |
+| Carte, Sert | la ou les cartes du profil qu'elle sert (`ecran_vitesses`), reconnues aux variables qu'elle demande |
+| Variables IOCP | les variables demandées par la carte à sa connexion (« 210 à 223 ») |
+| Adresse IP | donnée par la box : elle peut changer d'un jour à l'autre |
+| Adresse MAC, Fabricant | l'identité stable de la carte, lue dans la table réseau du PC ; `40:f5:20…` désigne Espressif (ESP8266, ESP32) |
+| Connectée, Première fois, Dernière fois | l'historique |
+
+Une carte IOCP n'annonce ni nom ni numéro de série : Pepit la reconnaît à son adresse MAC. Les cartes wifi se connectent au serveur IOCP que la page Simulateur ouvre pour les cartes déclarées par le profil : si le profil chargé n'en déclare aucune, aucun serveur n'est ouvert et l'onglet le signale.
+
 ## En fond
 
 Pepit suit les branchements en direct, page ouverte ou non (par les événements du noyau, sans droit particulier). Quand une carte de cockpit est branchée :
@@ -34,7 +51,7 @@ Pepit suit les branchements en direct, page ouverte ou non (par les événements
 - la page Cartes se met à jour ;
 - si Pepit n'y a pas accès, une bulle de la barre du haut le signale.
 
-L'historique est gardé dans `~/.local/state/pepit/peripheriques.yaml` : première et dernière fois, ports successifs, nombre de branchements. Une carte sans numéro de série (le cas des cartes OpenCockpits et EFDE) y est reconnue par sa prise : branchée ailleurs, elle compte comme une autre carte.
+L'historique est gardé dans `~/.local/state/pepit/peripheriques.yaml` : première et dernière fois, ports (ou adresses IP) successifs, nombre de branchements. Une carte sans numéro de série (le cas des cartes OpenCockpits et EFDE) y est reconnue par sa prise : branchée ailleurs, elle compte comme une autre carte.
 
 ## Autoriser un périphérique
 

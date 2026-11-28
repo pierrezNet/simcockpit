@@ -84,6 +84,11 @@ class IocpServer:
         with self._lock:
             return [f"{c.addr[0]}" for c in self._clients]
 
+    def client_list(self):
+        """[(adresse IP, variables demandées)] des cartes connectées."""
+        with self._lock:
+            return [(c.addr[0], frozenset(c.wanted)) for c in self._clients]
+
     def clients_for(self, variables):
         """Adresses des cartes connectées qui ont demandé au moins une de ces variables."""
         wanted = set(variables)

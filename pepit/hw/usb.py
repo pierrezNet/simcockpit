@@ -203,12 +203,17 @@ class Seen:
     plugs: int = 0                       # branchements vus
     plugged: bool = False
     access: str = ""                     # au dernier passage : « ok », « refusé », « »
+    kind: str = "usb"                    # « usb » ou « wifi » (carte IOCP)
+    extra: dict = field(default_factory=dict)   # wifi : MAC, fabricant, variables, cartes
 
     def to_yaml(self):
-        return {"nom": self.name, "vid_pid": self.vid_pid, "serie": self.serial,
-                "pepit": self.pepit, "cockpit": self.cockpit, "premiere_fois": self.first,
-                "derniere_fois": self.last, "ports": list(self.ports),
-                "branchements": self.plugs, "branche": self.plugged, "acces": self.access}
+        out = {"nom": self.name, "vid_pid": self.vid_pid, "serie": self.serial,
+               "pepit": self.pepit, "cockpit": self.cockpit, "premiere_fois": self.first,
+               "derniere_fois": self.last, "ports": list(self.ports),
+               "branchements": self.plugs, "branche": self.plugged, "acces": self.access}
+        if self.kind != "usb":
+            out["type"], out["details"] = self.kind, dict(self.extra)
+        return out
 
     @classmethod
     def from_yaml(cls, d):
@@ -218,7 +223,9 @@ class Seen:
                    last=str(d.get("derniere_fois", "")),
                    ports=[str(p) for p in d.get("ports") or []],
                    plugs=int(d.get("branchements", 0) or 0),
-                   plugged=bool(d.get("branche", False)), access=str(d.get("acces", "") or ""))
+                   plugged=bool(d.get("branche", False)), access=str(d.get("acces", "") or ""),
+                   kind=str(d.get("type", "usb")),
+                   extra=dict(d.get("details") or {}) if isinstance(d.get("details"), dict) else {})
 
 
 class History:
@@ -228,7 +235,7 @@ class History:
         self.path = path or os.path.join(state_dir(), "peripheriques.yaml")
         self.clock = clock
         self.seen = {}                   # clé -> Seen
-        self._started = False
+        self._started = set()            # sortes (« usb », « wifi ») déjà relevées une fois
         self.load()
 
     def load(self):
@@ -243,24 +250,28 @@ class History:
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         tmp = self.path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            f.write("# Pepit : périphériques USB déjà vus (écrit par la page Périphériques)\n")
+            f.write("# Pepit : périphériques USB et cartes wifi déjà vus (page Périphériques)\n")
             yaml.safe_dump({k: s.to_yaml() for k, s in sorted(self.seen.items())}, f,
                            allow_unicode=True, sort_keys=False)
         os.replace(tmp, self.path)
 
-    def update(self, devices):
-        """Prend en compte un relevé. Retourne les changements, pour le journal :
-        [(« branché » | « débranché » | « accès », Seen, UsbDevice ou None)]."""
+    def update(self, devices, kind="usb"):
+        """Prend en compte un relevé d'une sorte de périphériques (« usb » ou « wifi » :
+        les autres sortes ne sont pas touchées). Retourne les changements, pour le journal :
+        [(« branché » | « débranché » | « accès », Seen, périphérique ou None)]."""
         now, changes = self.clock(), []
-        first_pass = not self._started      # au lancement : rien n'est « branché à l'instant »
-        self._started = True
+        first_pass = kind not in self._started   # au lancement : rien n'est « branché à l'instant »
+        self._started.add(kind)
         present = {d.key: d for d in devices}
         for key, d in present.items():
             s = self.seen.get(key)
             if s is None:
                 s = self.seen[key] = Seen(name=d.name, vid_pid=d.vid_pid, serial=d.serial,
                                           first=now)
-            s.name, s.pepit, s.cockpit = d.name, d.pepit, d.cockpit
+            s.name, s.pepit, s.cockpit, s.kind = d.name, d.pepit, d.cockpit, kind
+            extra = getattr(d, "extra", None)
+            if extra:
+                s.extra = dict(extra)
             if d.port not in s.ports:
                 s.ports.append(d.port)
             if not s.plugged:
@@ -273,7 +284,7 @@ class History:
                     changes.append(("accès", s, d))
                 s.access = d.access
         for key, s in self.seen.items():
-            if s.plugged and key not in present:
+            if s.kind == kind and s.plugged and key not in present:
                 if first_pass:                   # débranché pendant que Pepit était arrêté :
                     s.plugged = False            # on ne sait pas quand
                     continue

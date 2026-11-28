@@ -70,6 +70,7 @@ class Pepit(QObject):
         self.hub = DeviceHub()               # chaque carte ouverte une fois, pour toutes les pages
         self.usb = UsbWatcher()              # branchements et historique, en fond
         self.usb.updated.connect(self.on_usb)
+        self.usb.network_source = self._network
         self.usb.start()
         self.tray = self._make_tray()
         app.setQuitOnLastWindowClosed(self.tray is None)
@@ -117,10 +118,17 @@ class Pepit(QObject):
         if len(fields) >= 2 and fields[0] == "afficher" and fields[1] in PAGES:
             self.show(fields[1], fields[2] if len(fields) > 2 else None)
 
+    def _network(self):
+        """Cartes wifi connectées aux serveurs IOCP du cockpit, pour la page Périphériques."""
+        window = self.pages.get("simulateur")
+        engine = getattr(window, "engine", None)
+        return engine.network_devices() if engine is not None else ([], [])
+
     def on_usb(self, changes):
         """Branchement d'une carte de cockpit : la page Cartes se met à jour, et une
         bulle prévient si Pepit n'y a pas accès."""
-        cockpit = [(kind, seen, dev) for kind, seen, dev in changes if seen.cockpit]
+        cockpit = [(kind, seen, dev) for kind, seen, dev in changes
+                   if seen.cockpit and seen.kind == "usb"]          # le wifi : rien à rouvrir
         if not cockpit:
             return
         if "cartes" in self.pages and any(k != "accès" for k, _s, _d in cockpit):

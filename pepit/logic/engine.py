@@ -279,10 +279,24 @@ class Engine:
             for ctrl in self._card_controls(cid):          # tout renvoyer au démarrage
                 if hasattr(ctrl, "take_values"):
                     server.set_values(dict(ctrl.values))
-        variables = {v for ctrl in self._card_controls(cid) for v in getattr(ctrl, "variables", ())}
-        clients = server.clients_for(variables)
+        clients = server.clients_for(self._card_variables(cid))
         self.status[cid] = (f"connectée (port {port}, carte {', '.join(clients)})" if clients
                             else f"en attente de la carte (serveur IOCP, port {port})")
+
+    def _card_variables(self, card_id):
+        return {v for ctrl in self._card_controls(card_id) for v in getattr(ctrl, "variables", ())}
+
+    def network_devices(self):
+        """Cartes wifi connectées aux serveurs IOCP, avec les cartes du profil qu'elles
+        servent. Retourne (liste de network.NetDevice, ports des serveurs ouverts)."""
+        from ..hw.network import NetDevice, arp_table
+        arp, out = arp_table(), []
+        for port, server in self.servers.items():
+            for ip, wanted in server.client_list():
+                cards = tuple(cid for cid, p in self._iocp_port.items()
+                              if p == port and wanted & self._card_variables(cid))
+                out.append(NetDevice(ip, arp.get(ip, ""), port, tuple(sorted(wanted)), cards))
+        return out, sorted(self.servers)
 
     def _card_controls(self, card_id):
         for inst in self.cockpit.instruments.values():

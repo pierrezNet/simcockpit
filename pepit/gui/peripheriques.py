@@ -1,7 +1,9 @@
-"""Page Périphériques : ce qui est branché en USB, où, depuis quand, et si Pepit y a accès.
+"""Page Périphériques : ce qui est branché en USB ou connecté en wifi, depuis quand, et
+si Pepit y a accès.
 
 Le veilleur (`UsbWatcher`) tourne dès le lancement de Pepit, page ouverte ou non : il
-suit les branchements (hw/uevent.py), relit sysfs (hw/usb.py) et tient l'historique.
+suit les branchements (hw/uevent.py), relit sysfs (hw/usb.py), relève les cartes wifi
+connectées aux serveurs IOCP du cockpit (hw/network.py) et tient l'historique.
 La page ne fait qu'afficher ce qu'il a relevé.
 """
 
@@ -10,9 +12,8 @@ import time
 from PySide6.QtCore import QObject, QProcess, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QHBoxLayout, QHeaderView, QLabel,
-                               QMessageBox,
-                               QListWidget, QMainWindow, QPushButton, QSplitter, QTableWidget,
-                               QTableWidgetItem, QVBoxLayout, QWidget)
+                               QListWidget, QMainWindow, QMessageBox, QPushButton, QSplitter,
+                               QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget)
 
 from ..hw import authorize, usb
 from ..hw.uevent import UeventMonitor
@@ -20,6 +21,7 @@ from .winstate import remember
 
 SETTLE = 400         # ms sans événement avant de relire (un branchement en produit une rafale)
 ACL_DELAY = 2000     # ms : udev pose les droits un peu après le noyau, on relit encore
+NETWORK_POLL = 2000  # ms : relevé des cartes wifi connectées
 
 # pastille : état -> (couleur, texte)
 STATES = {"ok": ("#2e9e44", "accessible"), "partiel": ("#f0a020", "accès partiel"),
@@ -27,6 +29,12 @@ STATES = {"ok": ("#2e9e44", "accessible"), "partiel": ("#f0a020", "accès partie
           "absent": ("#4a5257", "débranché")}
 COLUMNS = ["", "Périphérique", "Accès", "Pour Pepit", "VID:PID", "Port", "Vitesse", "Courant",
            "Branché", "Première fois", "Dernière fois", "Nœuds (✓ accessible)"]
+# cartes wifi : état -> (couleur, texte)
+NET_STATES = {"ok": ("#2e9e44", "connectée, sert le profil chargé"),
+              "inconnue": ("#f0a020", "connectée, mais le profil chargé ne la déclare pas"),
+              "absent": ("#4a5257", "déconnectée")}
+NET_COLUMNS = ["", "Carte", "Sert (profil chargé)", "Variables IOCP", "Adresse IP", "Adresse MAC",
+               "Fabricant", "Connectée", "Première fois", "Dernière fois"]
 
 
 class UsbWatcher(QObject):
@@ -39,6 +47,11 @@ class UsbWatcher(QObject):
         super().__init__(parent)
         self.history = history if history is not None else usb.History()
         self.devices = []
+        self.net_devices = []            # cartes wifi connectées (network.NetDevice)
+        self.iocp_ports = []             # ports des serveurs IOCP ouverts par le cockpit
+        # () -> (cartes wifi, ports) : fourni par l'application (moteur du cockpit)
+        self.network_source = None
+        self._net = QTimer(self, interval=NETWORK_POLL, timeout=self.refresh_network)
         self._settle = QTimer(self, singleShot=True, interval=SETTLE, timeout=self._after_event)
         self._acl = QTimer(self, singleShot=True, interval=ACL_DELAY, timeout=self.refresh)
         self._poke.connect(self._settle.start)
@@ -51,9 +64,11 @@ class UsbWatcher(QObject):
     def start(self):
         self.monitor.start()
         self.refresh()
+        self._net.start()
         return self
 
     def stop(self):
+        self._net.stop()
         self.monitor.stop()
 
     def _after_event(self):
@@ -62,8 +77,26 @@ class UsbWatcher(QObject):
 
     def refresh(self):
         self.devices = usb.scan()
-        changes = self.history.update(self.devices)
+        changes = self.history.update(self.devices, "usb")
         self.updated.emit(changes)
+
+    def refresh_network(self):
+        devices, ports = self.network_source() if self.network_source else ([], [])
+        self.net_devices, self.iocp_ports = devices, ports
+        changes = self.history.update(devices, "wifi")
+        self.updated.emit(changes)
+
+
+def _table(columns):
+    t = QTableWidget(0, len(columns))
+    t.setHorizontalHeaderLabels(columns)
+    t.verticalHeader().hide()
+    t.setSelectionBehavior(QAbstractItemView.SelectRows)
+    t.setAlternatingRowColors(True)
+    head = t.horizontalHeader()
+    head.setSectionResizeMode(QHeaderView.ResizeToContents)
+    head.setStretchLastSection(True)
+    return t
 
 
 def _item(text, tip=None, color=None):
@@ -113,17 +146,24 @@ class PeripheriquesPage(QMainWindow):
         lay.addWidget(self.setup_note)
         self.running = {}                    # vid:pid -> QProcess (autorisation en cours)
 
-        self.table = QTableWidget(0, len(COLUMNS))
-        self.table.setHorizontalHeaderLabels(COLUMNS)
-        self.table.verticalHeader().hide()
-        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setAlternatingRowColors(True)
-        head = self.table.horizontalHeader()
-        head.setSectionResizeMode(QHeaderView.ResizeToContents)
-        head.setStretchLastSection(True)    # les nœuds : liste parfois longue
+        self.table = _table(COLUMNS)
+        self.net_table = _table(NET_COLUMNS)
+        self.net_note = QLabel()
+        self.net_note.setWordWrap(True)
+        net_page = QWidget()
+        nl = QVBoxLayout(net_page)
+        nl.setContentsMargins(0, 0, 0, 0)
+        nl.addWidget(self.net_note)
+        nl.addWidget(self.net_table, 1)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self.table, "USB")
+        self.tabs.addTab(net_page, "Wifi (IOCP)")
+        self.tabs.setCurrentIndex(int(self.settings.value("peripheriques/onglet", 0)))
+        self.tabs.currentChanged.connect(
+            lambda i: self.settings.setValue("peripheriques/onglet", i))
         self.journal = QListWidget()
         split = QSplitter(Qt.Vertical)
-        split.addWidget(self.table)
+        split.addWidget(self.tabs)
         holder = QWidget()
         jl = QVBoxLayout(holder)
         jl.setContentsMargins(0, 0, 0, 0)
@@ -133,8 +173,10 @@ class PeripheriquesPage(QMainWindow):
         split.setStretchFactor(0, 4)
         split.setStretchFactor(1, 1)
         lay.addWidget(split, 1)
-        legend = QLabel("   ".join(f"<span style='color:{c}'>●</span> {t}"
-                                   for c, t in STATES.values()))
+        legend = QLabel("USB : " + "   ".join(f"<span style='color:{c}'>●</span> {t}"
+                                            for c, t in STATES.values())
+                        + "<br>Wifi : " + "   ".join(f"<span style='color:{c}'>●</span> {t}"
+                                                     for c, t in NET_STATES.values()))
         lay.addWidget(legend)
         self.setCentralWidget(body)
 
@@ -145,15 +187,22 @@ class PeripheriquesPage(QMainWindow):
     def on_update(self, changes):
         for kind, seen, dev in changes:
             port = dev.port if dev is not None else (seen.ports[-1] if seen.ports else "?")
+            if seen.kind == "wifi":
+                verb = {"branché": "connectée", "débranché": "déconnectée"}.get(kind, kind)
+                self._journal(f"wifi {verb} : {seen.name} ({port})")
+                continue
             extra = f", {STATES[dev.access][1]}" if dev is not None and dev.nodes else ""
             self._journal(f"{kind} : {seen.name} (port {port}{extra})")
         self.fill()
 
-    def rows(self):
-        """(Seen, UsbDevice ou None) à afficher : branchés d'abord, puis par nom."""
-        present = {d.key: d for d in self.watcher.devices}
+    def rows(self, kind="usb"):
+        """(Seen, périphérique ou None) à afficher : branchés d'abord, puis par nom."""
+        devices = self.watcher.devices if kind == "usb" else self.watcher.net_devices
+        present = {d.key: d for d in devices}
         out = []
         for key, seen in self.watcher.history.seen.items():
+            if seen.kind != kind:
+                continue
             dev = present.get(key)
             if dev is None and not self.show_absent.isChecked():
                 continue
@@ -165,10 +214,14 @@ class PeripheriquesPage(QMainWindow):
 
     def fill(self):
         rows = self.rows()
-        n = len(self.watcher.devices)
+        n, w = len(self.watcher.devices), len(self.watcher.net_devices)
         mode = ("surveillance en direct" if self.watcher.live
                 else "relecture chaque seconde (événements du noyau indisponibles)")
-        self.summary.setText(f"{n} périphérique(s) branché(s) — {mode}")
+        self.summary.setText(f"{n} périphérique(s) USB branché(s), {w} carte(s) wifi"
+                             f" connectée(s) — {mode}")
+        self.tabs.setTabText(0, f"USB ({n})")
+        self.tabs.setTabText(1, f"Wifi (IOCP) ({w})")
+        self.fill_network()
         self.table.setRowCount(len(rows))
         for r, (seen, dev) in enumerate(rows):
             state = dev.access if dev is not None else "absent"
@@ -202,6 +255,40 @@ class PeripheriquesPage(QMainWindow):
                 button = self._access_button(dev)
                 if button is not None:
                     self.table.setCellWidget(r, 2, button)
+
+    def fill_network(self):
+        ports = self.watcher.iocp_ports
+        self.net_note.setText(
+            f"Cartes wifi connectées au cockpit (serveur IOCP, port {', '.join(map(str, ports))})."
+            " Une carte est reconnue par son adresse MAC : son adresse IP peut changer."
+            if ports else
+            "Aucun serveur IOCP ouvert : le profil chargé dans la page Simulateur ne déclare pas"
+            " de carte wifi. Les cartes déjà vues restent dans l'historique.")
+        rows = self.rows("wifi")
+        self.net_table.setRowCount(len(rows))
+        for r, (seen, dev) in enumerate(rows):
+            x = seen.extra
+            if dev is not None:
+                color, label = NET_STATES["ok" if dev.cards else "inconnue"]
+                cells = [_item("●", label, color), _item(seen.name, f"clé : {dev.key}"),
+                         _item(", ".join(dev.cards) or "—"), _item(x.get("variables", "")),
+                         _item(dev.ip, f"ports IOCP : {dev.tcp_port}"), _item(dev.mac),
+                         _item(dev.vendor), _item(f"{seen.plugs} fois"), _item(seen.first),
+                         _item("maintenant")]
+            else:
+                grey, label = NET_STATES["absent"]
+                ips = ", ".join(seen.ports)
+                cells = [_item("●", label, grey), _item(seen.name, None, grey),
+                         _item(x.get("cartes", ""), None, grey),
+                         _item(x.get("variables", ""), None, grey),
+                         _item(seen.ports[-1] if seen.ports else "", f"adresses vues : {ips}", grey),
+                         _item(x.get("mac", ""), None, grey),
+                         _item(x.get("fabricant", ""), None, grey),
+                         _item(f"{seen.plugs} fois", None, grey), _item(seen.first, None, grey),
+                         _item(seen.last, None, grey)]
+            cells[0].setTextAlignment(Qt.AlignCenter)
+            for c, it in enumerate(cells):
+                self.net_table.setItem(r, c, it)
 
     # ------------------------------------------------------------ autoriser
     def _access_cell(self, dev):
