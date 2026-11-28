@@ -21,3 +21,6 @@ archives/
 # Identifiants wifi des cartes Arduino : jamais publiés (copier secrets.h.example)
 arduino/**/secrets.h
 arduino/**/.pio/
+
+# Site de documentation construit localement (mkdocs build)
+site/

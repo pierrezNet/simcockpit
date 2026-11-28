@@ -1,0 +1,3 @@
+# Site de documentation (https://pierreznet.github.io/pepit/) : MkDocs Material.
+# Aperçu local : .venv/bin/pip install -r requirements-docs.txt && .venv/bin/mkdocs serve
+mkdocs-material>=9.5,<10
