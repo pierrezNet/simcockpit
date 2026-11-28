@@ -18,9 +18,9 @@ import queue
 import time
 from dataclasses import dataclass
 
-from ..hw import manager, mcp, radio_airbus, usbfmc
+from ..hw import mcp, radio_airbus, usbfmc
 from ..hw.cards import classify
-from ..hw.device import Card
+from ..hw.hub import DeviceHub
 
 WRITE_GAP = 0.06
 WRITE_GAPS = {"fdbus": 0.01}     # le bus de jauges accepte des trames rapprochées
@@ -35,9 +35,13 @@ class Change:
 
 
 class Engine:
-    def __init__(self, cockpit):
+    def __init__(self, cockpit, hub=None):
         self.cockpit = cockpit
+        # cartes partagées avec le banc : le concentrateur les ouvre, on s'y abonne
+        self._own_hub = hub is None
+        self.hub = hub if hub is not None else DeviceHub()
         self.cards = {}            # id -> Card (connectées)
+        self._queues = {}          # id -> file d'événements de l'abonnement
         self.servers = {}          # port -> serveur IOCP, partagé par les cartes réseau de ce port
         self._iocp_port = {}       # id de carte IOCP -> port
         self.status = {cid: "non trouvée" for cid in cockpit.cards}
@@ -231,7 +235,7 @@ class Engine:
     def connect(self):
         """Ouvre les cartes déclarées (et la liaison X-Plane). Retourne {id: statut}."""
         self.connect_sim()
-        present = manager.scan()
+        present = self.hub.refresh()
         taken = set()
         for cid, spec in self.cockpit.cards.items():
             if classify(spec.product).protocol == "iocp":
@@ -247,13 +251,14 @@ class Engine:
                 self.status[cid] = "non trouvée"
                 continue
             taken.add(match.info.path)
-            card = Card(match.info, classify(match.info.product), state_events=True)
             try:
-                card.start()
+                card = self.hub.open(match)
             except OSError as e:
                 self.status[cid] = f"erreur : {e}"
                 continue
             self.cards[cid] = card
+            self._queues[cid] = card.listen()
+            self.hub.claim(card, "cockpit")
             self.resend_all(cid)
             self.status[cid] = f"connectée ({match.info.path}, port {match.info.usb_port})"
         return dict(self.status)
@@ -261,7 +266,7 @@ class Engine:
     def _serve_iocp(self, cid, spec):
         """Carte réseau IOCP : on ouvre le serveur ; la carte se connecte quand elle veut."""
         from ..hw.iocp import DEFAULT_PORT, IocpServer
-        port = spec.tcp_port or DEFAULT_PORT
+        port = DEFAULT_PORT if spec.tcp_port is None else spec.tcp_port
         server = self.servers.get(port)          # plusieurs cartes peuvent partager un port :
         if server is None:                       # chacune reçoit les variables qu'elle demande
             try:
@@ -300,7 +305,7 @@ class Engine:
         for cid, card in list(self.cards.items()):
             while True:
                 try:
-                    ev = card.events.get_nowait()
+                    ev = self._queues[cid].get_nowait()
                 except queue.Empty:
                     break
                 if ev.kind == "key":                  # clavier (CDU) : une touche par événement
@@ -316,8 +321,8 @@ class Engine:
                     self.bus_failed(cid, ev.value)
                 elif ev.kind == "error":
                     self.status[cid] = f"perdue : {ev.value}"
-                    card.stop()
-                    del self.cards[cid]
+                    self._drop(cid)
+                    break
         now = time.monotonic()
         if self.sim is not None:
             changed = self.sim.poll()
@@ -339,10 +344,17 @@ class Engine:
                     self.status[cid] = f"erreur d'écriture : {e}"
         return changes
 
+    def _drop(self, cid):
+        """Se désabonne de la carte (le concentrateur la ferme s'il le faut)."""
+        card = self.cards.pop(cid)
+        card.unlisten(self._queues.pop(cid))
+        self.hub.release(card, "cockpit")
+
     def close(self):
-        for card in self.cards.values():
-            card.stop()
-        self.cards.clear()
+        for cid in list(self.cards):
+            self._drop(cid)
+        if self._own_hub:
+            self.hub.close()
         for server in self.servers.values():
             server.stop()
         self.servers.clear()

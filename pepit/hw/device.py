@@ -22,12 +22,22 @@ class Event:
 
 
 class Card:
-    """Une carte physique. Les événements arrivent dans `self.events` (queue.Queue)."""
+    """Une carte physique, partagée entre plusieurs abonnés (le cockpit, le banc).
+
+    Chaque abonné obtient sa propre file par `listen()` et la rend par `unlisten()` ;
+    `self.events` est la file d'une carte non partagée (outils en ligne de commande) ; le
+    concentrateur ouvre ses cartes avec `shared=True`, sans cette file. Un abonné
+    arrivé tard reçoit d'abord l'état courant : entrées, axes, modules du bus.
+    """
 
     def __init__(self, info: HidInfo, ctype: CardType, debounce=0.05, raw_events=False,
-                 state_events=False):
+                 state_events=False, shared=False):
         self.info, self.type = info, ctype
-        self.events = queue.Queue()
+        self._events = None
+        self._queues = []
+        self._qlock = threading.Lock()          # abonnés et état rejoué, pour les deux fils
+        self._replay = {"ready": None, "state": None, "modules": [], "failed": None,
+                        "error": None}
         self.raw_events = raw_events
         self.state_events = state_events   # « state » : état brut complet à chaque trame d'entrées
         self.decoder = (bitmap.BitmapDecoder() if ctype.protocol == "bitmap"
@@ -41,6 +51,8 @@ class Card:
         self._init_request = threading.Event()  # FDBUS : (re)lancer l'initialisation du bus
         self.fdbus = None                       # FDBUS : automate d'initialisation (modules)
         self.t0 = time.monotonic()
+        if not shared:
+            self._events = self.listen()
 
     @property
     def name(self):
@@ -75,6 +87,8 @@ class Card:
     def write(self, report: bytes):
         if not self.type.send_init:
             raise PermissionError("carte inconnue : écriture interdite (écoute passive)")
+        if self.dev is None:
+            raise OSError("carte non ouverte")
         with self._wlock:
             return self.dev.write(report)
 
@@ -89,8 +103,68 @@ class Card:
         if self.dev:
             self.dev.close()
 
+    @property
+    def events(self):
+        if self._events is None:
+            self._events = self.listen()
+        return self._events
+
+    @property
+    def alive(self):
+        """Fil de lecture en marche (faux après une erreur : carte débranchée…)."""
+        return self._thread is not None and self._thread.is_alive()
+
+    def listen(self):
+        """Nouvelle file d'événements, préremplie de l'état courant de la carte."""
+        q = queue.Queue()
+        with self._qlock:
+            for ev in self._snapshot():
+                q.put(ev)
+            self._queues.append(q)
+        return q
+
+    def unlisten(self, q):
+        with self._qlock:
+            if q in self._queues:
+                self._queues.remove(q)
+
+    def _snapshot(self):
+        r, t = self._replay, time.monotonic() - self.t0
+        out = [Event("module", t, index=m.address, value=m) for m in r["modules"]]
+        out += [Event("axis", t, index=i, value=v) for i, v in sorted(self.axes.items())]
+        if r["state"] is not None:
+            out.append(Event("state", t, value=list(r["state"])))
+        if r["ready"] is not None:
+            out.append(Event("ready", t, value=list(r["ready"])))
+        if r["failed"] is not None:
+            out.append(Event("init_failed", t, value=r["failed"]))
+        if r["error"] is not None:
+            out.append(Event("error", t, value=r["error"]))
+        return out
+
+    def _remember(self, ev):
+        r = self._replay
+        if ev.kind == "ready":
+            r["ready"], r["failed"] = list(ev.value), None
+        elif ev.kind == "input" and r["ready"] is not None and ev.index < len(r["ready"]):
+            r["ready"][ev.index] = ev.value          # état stable tenu à jour
+        elif ev.kind == "state":
+            r["state"] = ev.value
+        elif ev.kind == "module":
+            r["modules"].append(ev.value)
+        elif ev.kind == "log" and ev.value.startswith("exploration"):
+            r["modules"], r["ready"], r["failed"] = [], None, None   # bus réexploré
+        elif ev.kind == "init_failed":
+            r["failed"] = ev.value
+        elif ev.kind == "error":
+            r["error"] = ev.value
+
     def _emit(self, kind, **kw):
-        self.events.put(Event(kind, time.monotonic() - self.t0, **kw))
+        ev = Event(kind, time.monotonic() - self.t0, **kw)
+        with self._qlock:
+            self._remember(ev)
+            for q in self._queues:
+                q.put(ev)
 
     def _run(self):
         ready = False

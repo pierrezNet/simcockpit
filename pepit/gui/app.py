@@ -5,15 +5,16 @@ import sys
 from PySide6.QtWidgets import (QApplication, QCheckBox, QHBoxLayout, QLabel, QMainWindow,
                                QPushButton, QTabWidget, QVBoxLayout, QWidget)
 
-from ..hw import manager
+from ..hw.hub import DeviceHub
 from .card_view import CardView
 from .qtenv import prepare
 from .winstate import remember
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, hub=None):
         super().__init__()
+        self.hub = hub if hub is not None else DeviceHub()   # partagé avec le cockpit
         self.setWindowTitle("Pepit — cartes")
         remember(self, "banc_de_test", (1200, 700))   # position et taille mémorisées
         self.views = {}  # usb_port -> CardView
@@ -43,14 +44,14 @@ class MainWindow(QMainWindow):
             self.tabs.removeTab(self.tabs.indexOf(view))
             view.deleteLater()
         self.views.clear()
-        cards = manager.scan()
+        cards = self.hub.refresh()
         if not cards:
             self.found.setText("Aucune carte de cockpit détectée. Branchez-la puis « Rechercher ».")
             return
         self.found.setText("Cartes : " + ", ".join(
             f"{d.label} (port {d.info.usb_port})" for d in cards))
         for d in cards:
-            view = CardView(d)
+            view = CardView(d, self.hub)
             self.tabs.addTab(view, f"{d.label.split(' (')[0]} [{d.info.usb_port}]")
             self.views[d.info.usb_port] = view
             view.activity.connect(lambda v=view: self._follow(v))
@@ -69,6 +70,9 @@ class MainWindow(QMainWindow):
 def main():
     prepare()
     app = QApplication(sys.argv)
-    win = MainWindow()
+    hub = DeviceHub()
+    win = MainWindow(hub)
     win.show()
-    return app.exec()
+    code = app.exec()
+    hub.close()
+    return code

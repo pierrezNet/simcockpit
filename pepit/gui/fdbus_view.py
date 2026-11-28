@@ -340,6 +340,7 @@ class FdbusView(QWidget):
     def __init__(self, card, parent=None):
         super().__init__(parent)
         self.card = card
+        self.driven = lambda: False                # le cockpit pilote-t-il les jauges ?
         self.out = fdbus.FdbusOutputs()
         self.cals = fdbus.load_calibrations()      # (adresse, sortie) -> Calibration
         self.panels = {}                           # adresse -> GaugePanel
@@ -464,7 +465,8 @@ class FdbusView(QWidget):
             panel = GaugePanel(self, m)
             self.grid.addWidget(panel, k // PER_ROW, k % PER_ROW)
             self.panels[m.address] = panel
-            self.request(m.address, panel.rest_position())   # aiguilles au repos
+            if not self.driven():                    # aiguilles au repos, sauf si le
+                self.request(m.address, panel.rest_position())   # cockpit les tient
         self.status.setText(f"{self.card.name} — {self.card.info.path} — prêt.")
         self.timer.start(50)
 

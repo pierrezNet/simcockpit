@@ -628,9 +628,10 @@ class ControlWidget(QWidget):
 
 
 class PanelWindow(QMainWindow):
-    def __init__(self, path):
+    def __init__(self, path, hub=None):
         super().__init__()
         self.path = path
+        self.hub = hub            # cartes partagées avec le banc (None : le moteur ouvre les siennes)
         self.engine = None
         self.widgets = {}
         self.setWindowTitle(f"Pepit — simulateur ({path})")
@@ -686,7 +687,7 @@ class PanelWindow(QMainWindow):
             self.cards_label.setText(f"<span style='color:#e55'>Configuration invalide : {e}</span>")
             self.engine = None
             return
-        self.engine = Engine(cockpit)
+        self.engine = Engine(cockpit, self.hub)
         for inst in cockpit.instruments.values():
             page = QWidget()
             scroll = QScrollArea()                 # défilement si la fenêtre est trop petite

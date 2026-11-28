@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QMenu, QSystem
                                QVBoxLayout, QWidget)
 
 from ..gui.qtenv import prepare
+from ..hw.hub import DeviceHub
 from ..gui.winstate import remember
 from . import instance
 
@@ -83,6 +84,7 @@ class Pepit(QObject):
         self.app = app
         self.quitting = False
         self.pages = {}
+        self.hub = DeviceHub()               # chaque carte ouverte une fois, pour toutes les pages
         self.tray = self._make_tray()
         app.setQuitOnLastWindowClosed(self.tray is None)
         self._hide_filter = _HideOnClose(self)
@@ -95,11 +97,11 @@ class Pepit(QObject):
         if window is None:
             if name == "simulateur":
                 from ..panel.app import PanelWindow
-                window = PanelWindow(self.profile)
+                window = PanelWindow(self.profile, self.hub)
                 settings().setValue("profil", self.profile)
             elif name == "cartes":
                 from ..gui.app import MainWindow
-                window = MainWindow()
+                window = MainWindow(self.hub)
             else:
                 window = PeripheriquesPage()
             window.installEventFilter(self._hide_filter)
@@ -148,7 +150,8 @@ class Pepit(QObject):
     def quit(self):
         self.quitting = True
         for window in self.pages.values():
-            window.close()                   # le cockpit ferme ses cartes et sa liaison
+            window.close()                   # chacun se désabonne ; le cockpit ferme sa liaison
+        self.hub.close()                     # puis les cartes elles-mêmes
         if self.tray is not None:
             self.tray.hide()
         self.app.quit()

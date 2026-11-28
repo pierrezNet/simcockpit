@@ -15,6 +15,7 @@ from .fdbus_view import FdbusView
 ACTIVE = "#2e9e44"       # vert : entrée actionnée
 REST = "#3a3f47"         # gris : repos
 RECENT = "#f0a020"       # orange : vient de changer
+BANNER = "#f0c040"       # jaune : carte pilotée par le cockpit
 OUT_ON = "#d03030"
 OUT_OFF = "#3a3f47"
 # Délai entre deux trames écrites : le MCP ignore les trames trop rapprochées
@@ -52,11 +53,16 @@ class CardView(QWidget):
     # une commande de la carte vient d'être actionnée (entrée ou touche ; pas les axes)
     activity = Signal()
 
-    def __init__(self, detected, parent=None):
+    def __init__(self, detected, hub, parent=None):
         super().__init__(parent)
         self.detected = detected
-        self.card = Card(detected.info, detected.type, debounce=0.03,
-                         raw_events=not detected.known)
+        self.hub = hub
+        self.events = None        # abonnement à la carte (partagée avec le cockpit)
+        self._drivers = None
+        try:                      # la carte est ouverte par le concentrateur, une seule fois
+            self.card, self.open_error = hub.open(detected), None
+        except OSError as e:      # PermissionError comprise : affichée par start()
+            self.card, self.open_error = Card(detected.info, detected.type), e
         self.state = [None] * mastercard.INPUTS
         self.rest = None          # état de repos mémorisé : « actionnée » = différente du repos
         self.changed_at = [0.0] * mastercard.INPUTS
@@ -492,6 +498,7 @@ class CardView(QWidget):
         """Bus des jauges : tout l'onglet est dans gui/fdbus_view.py."""
         root = QVBoxLayout(self)
         self.fd_view = FdbusView(self.card, self)
+        self.fd_view.driven = self.driven
         root.addWidget(self.fd_view)
         self.last, self.log, self.status = self.fd_view.last, self.fd_view.log, self.fd_view.status
 
@@ -517,8 +524,15 @@ class CardView(QWidget):
 
     # ------------------------------------------------------------------ cycle de vie
     def start(self):
+        self.banner = QLabel()
+        self.banner.setWordWrap(True)
+        self.banner.setStyleSheet(f"background:{BANNER}; color:#111; padding:6px;"
+                                  " font-weight:bold;")
+        self.banner.hide()
+        self.layout().insertWidget(0, self.banner)
         try:
-            self.card.start()
+            if self.open_error is not None:
+                raise self.open_error
         except PermissionError:
             self.status.setText(
                 f"Accès refusé à {self.detected.info.path} : installez la règle udev"
@@ -531,20 +545,42 @@ class CardView(QWidget):
             self.status.setText(f"Impossible d'ouvrir {self.detected.info.path} : {e}")
             return
         self.status.setText(f"{self.card.name} — {self.detected.info.path} — en attente de l'état…")
+        self.events = self.card.listen()      # l'état courant arrive en premier
+        self._show_drivers()
         self.timer.start(20)
 
     def stop(self):
+        """Se désabonne ; la carte reste ouverte pour le cockpit (le concentrateur la ferme)."""
         self.timer.stop()
         if hasattr(self, "fd_view"):
             self.fd_view.stop()
-        self.card.stop()
+        if self.events is not None:
+            self.card.unlisten(self.events)
+            self.events = None
+
+    def driven(self):
+        """Le cockpit pilote-t-il cette carte ? (ses sorties, ses afficheurs)"""
+        return "cockpit" in self.hub.drivers(self.card)
+
+    def _show_drivers(self):
+        drivers = self.hub.drivers(self.card)
+        if drivers == self._drivers:
+            return
+        self._drivers = drivers
+        if "cockpit" in drivers:
+            self.banner.setText("Carte pilotée par le cockpit (page Simulateur) : ce que vous"
+                                " écrivez ici sera remplacé par ses propres sorties.")
+            self.banner.show()
+        else:
+            self.banner.hide()
 
     # ------------------------------------------------------------------ événements
     def _poll(self):
         now = time.monotonic() - self.card.t0
+        self._show_drivers()
         while True:
             try:
-                ev = self.card.events.get_nowait()
+                ev = self.events.get_nowait()
             except queue.Empty:
                 break
             self.handle(ev)
