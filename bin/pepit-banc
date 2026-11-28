@@ -1,4 +1,3 @@
 #!/bin/sh
-# Fenêtre de test des cartes (Pepit).
-# --dev : relance automatique à chaque modification du code.
-cd "$(dirname "$0")/.." && exec .venv/bin/python -m pepit.gui "$@"
+# Ancien nom de bin/pepit-cartes (fenêtre de test des cartes), gardé le temps de l'habitude.
+exec "$(dirname "$0")/pepit-cartes" "$@"

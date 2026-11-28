@@ -1,5 +1,4 @@
 #!/bin/sh
-# Panneau virtuel (logique métier) ; par défaut l'avion config/avions/rj85-simule.
-# Autre avion : bin/pepit-cockpit config/avions/b738-laminar
-# --dev : relance automatique à chaque modification du code ou de la configuration.
-cd "$(dirname "$0")/.." && exec .venv/bin/python -m pepit.panel "$@"
+# Ancien nom de bin/pepit-simulateur (cockpit), gardé le temps de l'habitude.
+# Exemple : bin/pepit-cockpit config/avions/bae146-jf
+exec "$(dirname "$0")/pepit-simulateur" "$@"

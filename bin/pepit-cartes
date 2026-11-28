@@ -1,0 +1,5 @@
+#!/bin/sh
+# Pepit, page « cartes ». Si Pepit est déjà ouvert, la page s'ajoute à l'application en cours.
+# --dev : relance automatique à chaque modification du code ou de la configuration.
+# --fond : démarrer sans fenêtre (icône dans la barre du haut).
+cd "$(dirname "$0")/.." && exec .venv/bin/python -m pepit.app --page cartes "$@"

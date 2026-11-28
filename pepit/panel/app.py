@@ -633,7 +633,7 @@ class PanelWindow(QMainWindow):
         self.path = path
         self.engine = None
         self.widgets = {}
-        self.setWindowTitle(f"Pepit — panneau virtuel ({path})")
+        self.setWindowTitle(f"Pepit — simulateur ({path})")
         remember(self, "cockpit_virtuel", (1200, 700))   # position et taille mémorisées
 
         central = QWidget()
@@ -657,6 +657,12 @@ class PanelWindow(QMainWindow):
 
         self.tick = QTimer(self, interval=20, timeout=self._step)
         self.retry = QTimer(self, interval=2000, timeout=self._connect)
+        self.load()
+
+    def set_profile(self, path):
+        """Change de profil d'avion (dossier de config/avions/) et le recharge."""
+        self.path = path
+        self.setWindowTitle(f"Pepit — simulateur ({path})")
         self.load()
 
     def _clear_body(self):

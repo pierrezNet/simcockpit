@@ -14,7 +14,7 @@ from .winstate import remember
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Pepit — test des cartes")
+        self.setWindowTitle("Pepit — cartes")
         remember(self, "banc_de_test", (1200, 700))   # position et taille mémorisées
         self.views = {}  # usb_port -> CardView
 
