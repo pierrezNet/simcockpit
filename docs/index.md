@@ -38,7 +38,7 @@ hide:
 
     ---
 
-    OpenCockpits, EFDE, manettes Thrustmaster : détectées à leur branchement, sans pilote à installer, et vérifiées entrée par entrée au banc de test.
+    OpenCockpits, EFDE, manettes Thrustmaster : détectées à leur branchement, sans pilote à installer, vérifiées entrée par entrée au banc de test, et leur accès ouvert d'un clic.
 
     [:octicons-arrow-right-24: Cartes prises en charge](materiel/cartes.md)
 
@@ -46,9 +46,9 @@ hide:
 
     ---
 
-    MCP, CDU et son écran, radio, transpondeur, jauges, manettes des gaz : profils complets du BAe 146 et du Boeing 737-800.
+    MCP, CDU et son écran, radio, transpondeur, jauges, manettes des gaz : profils complets du BAe 146 et du Boeing 737-800, choisis selon l'avion chargé. X-Plane se lance d'un clic.
 
-    [:octicons-arrow-right-24: Le cockpit et X-Plane](utilisation/cockpit.md)
+    [:octicons-arrow-right-24: La page Simulateur](utilisation/cockpit.md)
 
 -   :material-wifi:{ .lg .middle } **Cartes wifi de SIOC**
 
@@ -94,13 +94,13 @@ flowchart LR
 2.  **Les tester au banc** : chaque entrée s'allume quand on l'actionne, chaque sortie se commande.
 
     ```sh
-    bin/pepit-banc
+    bin/pepit-cartes
     ```
 
-3.  **Lancer le cockpit**, relié à X-Plane :
+3.  **Lancer le cockpit**, puis X-Plane d'un clic depuis la page Simulateur :
 
     ```sh
-    bin/pepit-cockpit config/avions/bae146-jf
+    bin/pepit-simulateur config/avions/bae146-jf
     ```
 
 </div>

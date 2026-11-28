@@ -1,8 +1,7 @@
 # Avro RJ85 simulé
 
 ```sh
-bin/pepit-cockpit                         # profil par défaut
-bin/pepit-cockpit config/avions/rj85-simule
+bin/pepit-simulateur config/avions/rj85-simule   # profil par défaut au tout premier lancement
 ```
 
 Le profil `config/avions/rj85-simule/` fait fonctionner le matériel **sans simulateur**. La logique de l'avion est simulée par Pepit, ce qui permet de tester un cockpit sans lancer X-Plane. Le RJ85 n'existe pas pour X-Plane ; le cockpit pour lequel Pepit a été écrit est celui d'un RJ85.

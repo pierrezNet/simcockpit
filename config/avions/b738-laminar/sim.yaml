@@ -1,5 +1,5 @@
 # Boeing 737-800 de Laminar (X-Plane 12) : liaison UDP avec X-Plane.
-# Lancement : bin/pepit-cockpit config/avions/b738-laminar  (X-Plane lancé, 737 chargé)
+# Lancement : bin/pepit-simulateur config/avions/b738-laminar, ou tout seul quand X-Plane charge le 737
 
 sim:
   type: xplane

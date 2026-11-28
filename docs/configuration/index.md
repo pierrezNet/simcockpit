@@ -60,7 +60,7 @@ instruments:
 
 Dans le même dossier, on trouve aussi :
 
-- **`sim:`**, la liaison au simulateur, dans un des fichiers (en général `sim.yaml`) ;
+- **`sim:`**, la liaison au simulateur, dans un des fichiers (en général `sim.yaml`). Sa clé `avion:` donne le ou les codes OACI de l'avion (`avion: B738`, ou `avion: [B461, B462]`) : quand X-Plane charge cet avion, la page Simulateur prend ce profil ;
 - **`fonctions:`**, les fonctions propres à l'avion, qui complètent le [dictionnaire](dictionnaire.md) (en général `fonctions.yaml`).
 
 Les onglets suivent l'ordre alphabétique des fichiers. Seules les cartes utilisées par l'avion sont ouvertes. Pour un nouvel avion, copiez un dossier existant et adaptez-le.
@@ -72,4 +72,4 @@ Les numéros d'entrées et de sorties sont ceux affichés par le [banc de test](
     - **Pas de tabulation** dans l'indentation, seulement des espaces. Pepit refuse le fichier en donnant la ligne.
     - **Une description qui contient « : »** doit être entre guillemets.
 
-Une erreur de configuration est signalée en rouge dans le cockpit, avec le fichier, l'instrument et la commande en cause.
+Une erreur de configuration est signalée en rouge dans la page Simulateur, avec le fichier, l'instrument et la commande en cause.

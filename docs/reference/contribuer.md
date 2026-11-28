@@ -12,17 +12,20 @@ Les tests n'ont besoin ni des cartes ni d'X-Plane : ils rejouent des captures r�
 
 ```
 arduino/        programmes des cartes Arduino / ESP (identifiants wifi dans secrets.h, non publié)
-bin/            lanceurs : pepit (ligne de commande), pepit-banc, pepit-cockpit
+bin/            lanceurs : pepit (ligne de commande), pepit-simulateur, pepit-cartes,
+                pepit-peripheriques ; pepit-installer (droits matériels, une fois, sudo)
 config/         configuration : matériel, dictionnaire, un dossier par avion
 docs/           ce site (MkDocs Material)
-pepit/hw/       accès aux cartes et protocoles (hidraw, evdev, serveur IOCP…)
+pepit/app/      l'application : une seule instance, trois pages, icône de la barre du haut
+pepit/hw/       accès aux cartes et protocoles (hidraw, evdev, serveur IOCP…), concentrateur,
+                périphériques USB et autorisations
 pepit/diag/     bruit, assistants de test des entrées et des sorties
 pepit/logic/    configuration, dictionnaire des fonctions, types de commandes, moteur
-pepit/sim/      liaison X-Plane (UDP et API web)
-pepit/gui/      banc de test des cartes
-pepit/panel/    cockpit (fenêtre du panneau, écran physique du CDU)
+pepit/sim/      liaison X-Plane (UDP et API web), lancement d'X-Plane
+pepit/gui/      pages Cartes (banc de test) et Périphériques
+pepit/panel/    page Simulateur (le cockpit, écran physique du CDU)
 tests/          tests unitaires et captures réelles
-udev/           règle d'accès aux cartes
+udev/           règle d'accès aux cartes, assistant d'autorisation et sa règle polkit
 ```
 
 ## La règle d'architecture

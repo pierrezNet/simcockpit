@@ -13,18 +13,31 @@ python3 -m venv .venv
 
 `requirements.txt` n'installe que deux bibliothèques : PySide6 (les fenêtres) et PyYAML (la configuration). L'accès aux cartes et la ligne de commande n'utilisent que la bibliothèque standard de Python.
 
-## L'accès aux cartes sans `sudo`
+## L'accès aux cartes
 
-Les cartes OpenCockpits et EFDE sont des périphériques HID que Linux réserve à `root`. La règle udev de Pepit les ouvre aux membres du groupe `plugdev` :
+Les cartes OpenCockpits et EFDE sont des périphériques HID que Linux réserve à `root`. Une installation unique, avec `sudo`, règle l'accès aux cartes connues et prépare le bouton « Autoriser » de la [page Périphériques](../utilisation/peripheriques.md), qui ouvre ensuite l'accès à tout autre périphérique sans mot de passe.
+
+Lisez d'abord le script, puis lancez-le :
 
 ```sh
-sudo cp udev/99-pepit.rules /etc/udev/rules.d/
-sudo udevadm control --reload && sudo udevadm trigger
+less bin/pepit-installer
+sudo bin/pepit-installer
 ```
+
+Il installe :
+
+| Fichier | Rôle |
+|---|---|
+| `/etc/udev/rules.d/99-pepit.rules` | l'accès aux cartes OpenCockpits et EFDE pour le groupe `plugdev` |
+| `/usr/local/libexec/pepit-autoriser` | l'assistant du bouton « Autoriser », propriété de `root` ; Pepit n'appelle jamais la copie du dépôt |
+| `/usr/share/polkit-1/actions/org.pepit.autoriser.policy` | la règle polkit : l'assistant se lance sans mot de passe pour l'utilisateur assis devant le PC, jamais pour une session distante |
+| `/etc/udev/rules.d/70-pepit-autorises.rules` | les modèles autorisés par le bouton, vide au départ |
 
 Débranchez puis rebranchez les cartes. Vérifiez que vous êtes dans le groupe `plugdev` avec la commande `id` ; sinon, ajoutez-vous avec `sudo usermod -aG plugdev $USER`, puis fermez et rouvrez votre session.
 
-Les manettes Thrustmaster n'ont pas besoin de cette règle : Pepit les lit par l'interface joystick de Linux, déjà accessible à l'utilisateur de la session.
+`sudo bin/pepit-installer --desinstaller` retire l'assistant et la règle polkit.
+
+Les manettes Thrustmaster et autres joysticks n'ont besoin de rien : Pepit les lit par l'interface joystick de Linux, déjà accessible à l'utilisateur de la session.
 
 ## Les fenêtres sous GNOME Wayland
 
@@ -39,7 +52,7 @@ sudo apt install libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-xkb1 libxkb
 Seulement si vous utilisez des [cartes wifi](../materiel/cartes-wifi.md) :
 
 - installez **PlatformIO** (extension de VS Code, ou en ligne de commande) ;
-- pour téléverser par le câble USB, ajoutez-vous au groupe `dialout` : `sudo usermod -aG dialout $USER`, puis fermez et rouvrez votre session.
+- pour téléverser par le câble USB, la carte doit être accessible : bouton « Autoriser » de la [page Périphériques](../utilisation/peripheriques.md), ou groupe `dialout` (`sudo usermod -aG dialout $USER`, puis fermez et rouvrez votre session).
 
 ## Vérifier
 
@@ -47,4 +60,8 @@ Seulement si vous utilisez des [cartes wifi](../materiel/cartes-wifi.md) :
 bin/pepit list
 ```
 
-La commande affiche les cartes de cockpit branchées, leur type et leur port USB. Si une carte manque, voyez le [banc de test](../utilisation/banc.md) : il signale une carte présente mais inaccessible.
+La commande affiche les cartes de cockpit branchées, leur type et leur port USB. Si une carte manque, ouvrez la page Périphériques : elle montre chaque périphérique branché et si Pepit y a accès.
+
+```sh
+bin/pepit-peripheriques
+```

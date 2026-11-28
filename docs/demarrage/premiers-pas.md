@@ -20,10 +20,10 @@ Le **port USB** (ici `1-14`) identifie la carte. Ces cartes n'ont pas de numéro
 ## 2. Trouver le numéro de l'interrupteur
 
 ```sh
-bin/pepit-banc
+bin/pepit-cartes
 ```
 
-L'onglet de la carte montre toutes ses entrées. Basculez l'interrupteur : sa case s'allume et son numéro s'affiche en grand. Notez-le, par exemple **12**.
+La page Cartes montre toutes ses entrées. Basculez l'interrupteur : sa case s'allume et son numéro s'affiche en grand. Notez-le, par exemple **12**.
 
 Pour le voyant, ouvrez la partie « Sorties », cochez « Autoriser l'écriture » et allumez les sorties une à une jusqu'à trouver la vôtre, par exemple **42**.
 
@@ -55,10 +55,10 @@ instruments:
 Lancez le cockpit sur ce dossier :
 
 ```sh
-bin/pepit-cockpit --dev config/avions/essai
+bin/pepit-simulateur --dev config/avions/essai
 ```
 
-L'onglet « Essai » montre l'état de l'interrupteur, et le journal note chaque bascule. Avec `--dev`, le cockpit se relance tout seul à chaque modification du YAML.
+L'onglet « Essai » montre l'état de l'interrupteur, et le journal note chaque bascule. Avec `--dev`, Pepit se relance tout seul à chaque modification du YAML.
 
 ## 5. Relier au simulateur
 
@@ -69,6 +69,7 @@ sim:
   type: xplane
   host: 127.0.0.1
   port: 49000
+  avion: C172      # facultatif : code OACI, pour que Pepit prenne ce profil tout seul
 ```
 
 Puis dites ce que fait l'interrupteur dans X-Plane :
@@ -81,7 +82,7 @@ Puis dites ce que fait l'interrupteur dans X-Plane :
         command_off: sim/electrical/battery_1_off
 ```
 
-Lancez X-Plane, chargez un avion : la barre du cockpit passe à « X-Plane : connecté », et l'interrupteur commande la batterie.
+Lancez X-Plane, chargez un avion : la page Simulateur passe à « X-Plane : connecté », et l'interrupteur commande la batterie.
 
 !!! tip "Noms logiques"
     Plutôt qu'écrire les commandes X-Plane dans chaque fichier, on peut citer une fonction du [dictionnaire](../configuration/dictionnaire.md) : `fonction: transpondeur.mode`. Le profil reste alors valable pour d'autres avions.

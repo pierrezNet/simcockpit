@@ -72,8 +72,10 @@ nav:
       - Installation: demarrage/installation.md
       - Premiers pas: demarrage/premiers-pas.md
   - Utiliser:
-      - Le banc de test: utilisation/banc.md
-      - Le cockpit et X-Plane: utilisation/cockpit.md
+      - L'application: utilisation/application.md
+      - Page Simulateur (cockpit et X-Plane): utilisation/cockpit.md
+      - Page Cartes (banc de test): utilisation/banc.md
+      - Page Périphériques: utilisation/peripheriques.md
       - Ligne de commande: utilisation/ligne-de-commande.md
   - Configurer:
       - Organisation: configuration/index.md
