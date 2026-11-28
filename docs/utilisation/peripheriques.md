@@ -44,6 +44,12 @@ Une ligne par [carte wifi](../materiel/cartes-wifi.md) déjà connectée au cock
 
 Une carte IOCP n'annonce ni nom ni numéro de série : Pepit la reconnaît à son adresse MAC. Les cartes wifi se connectent au serveur IOCP que la page Simulateur ouvre pour les cartes déclarées par le profil : si le profil chargé n'en déclare aucune, aucun serveur n'est ouvert et l'onglet le signale.
 
+## Nommer un périphérique
+
+Double-clic sur le nom, ou clic droit puis « Renommer… » : le nom choisi (par exemple « Écran des vitesses (LilyGo) » à la place de « Silicon Labs CP2104 USB to UART Bridge Controller ») s'affiche en gras, ici et dans la [page Cartes](banc.md). Le nom annoncé par le périphérique reste visible au survol ; « Reprendre le nom annoncé » efface le nom choisi.
+
+Les noms sont gardés dans `~/.config/pepit/noms.yaml`, par identité du périphérique : numéro de série, ou prise pour une carte qui n'en a pas (USB), adresse MAC (wifi). Une même carte branchée en USB et connectée en wifi (une LilyGo, par exemple) a deux identités : nommez-la dans les deux onglets.
+
 ## En fond
 
 Pepit suit les branchements en direct, page ouverte ou non (par les événements du noyau, sans droit particulier). Quand une carte de cockpit est branchée :

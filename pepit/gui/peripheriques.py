@@ -11,11 +11,13 @@ import time
 
 from PySide6.QtCore import QObject, QProcess, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QHBoxLayout, QHeaderView, QLabel,
-                               QListWidget, QMainWindow, QMessageBox, QPushButton, QSplitter,
-                               QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QHBoxLayout, QHeaderView,
+                               QInputDialog, QLabel, QListWidget, QMainWindow, QMenu, QMessageBox,
+                               QPushButton, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
+                               QVBoxLayout, QWidget)
 
 from ..hw import authorize, usb
+from ..hw.names import Names
 from ..hw.uevent import UeventMonitor
 from .winstate import remember
 
@@ -46,6 +48,7 @@ class UsbWatcher(QObject):
     def __init__(self, history=None, parent=None):
         super().__init__(parent)
         self.history = history if history is not None else usb.History()
+        self.names = Names()             # noms donnés par l'utilisateur
         self.devices = []
         self.net_devices = []            # cartes wifi connectées (network.NetDevice)
         self.iocp_ports = []             # ports des serveurs IOCP ouverts par le cockpit
@@ -110,6 +113,9 @@ def _item(text, tip=None, color=None):
 
 
 class PeripheriquesPage(QMainWindow):
+    # un périphérique a été renommé (clé) : les autres pages mettent leurs noms à jour
+    renamed = Signal(str)
+
     def __init__(self, watcher):
         super().__init__()
         self.watcher = watcher
@@ -155,6 +161,12 @@ class PeripheriquesPage(QMainWindow):
         nl.setContentsMargins(0, 0, 0, 0)
         nl.addWidget(self.net_note)
         nl.addWidget(self.net_table, 1)
+        for table in (self.table, self.net_table):
+            table.setContextMenuPolicy(Qt.CustomContextMenu)
+            table.customContextMenuRequested.connect(
+                lambda pos, t=table: self._context_menu(t, pos))
+            table.cellDoubleClicked.connect(
+                lambda row, col, t=table: self.rename(self._key_at(t, row)) if col == 1 else None)
         self.tabs = QTabWidget()
         self.tabs.addTab(self.table, "USB")
         self.tabs.addTab(net_page, "Wifi (IOCP)")
@@ -189,10 +201,10 @@ class PeripheriquesPage(QMainWindow):
             port = dev.port if dev is not None else (seen.ports[-1] if seen.ports else "?")
             if seen.kind == "wifi":
                 verb = {"branché": "connectée", "débranché": "déconnectée"}.get(kind, kind)
-                self._journal(f"wifi {verb} : {seen.name} ({port})")
+                self._journal(f"wifi {verb} : {self.display(seen)} ({port})")
                 continue
             extra = f", {STATES[dev.access][1]}" if dev is not None and dev.nodes else ""
-            self._journal(f"{kind} : {seen.name} (port {port}{extra})")
+            self._journal(f"{kind} : {self.display(seen)} (port {port}{extra})")
         self.fill()
 
     def rows(self, kind="usb"):
@@ -208,9 +220,65 @@ class PeripheriquesPage(QMainWindow):
                 continue
             if self.only_cockpit.isChecked() and not seen.cockpit:
                 continue
-            out.append((seen, dev))
-        out.sort(key=lambda r: (r[1] is None, not r[0].cockpit, r[0].name.lower()))
+            out.append((key, seen, dev))
+        out.sort(key=lambda r: (r[2] is None, not r[1].cockpit,
+                                self.watcher.names.get(r[0], r[1].name).lower()))
         return out
+
+    # ------------------------------------------------------------ noms
+    def display(self, seen, key=None):
+        """Nom à afficher : celui donné par l'utilisateur, sinon celui annoncé."""
+        if key is None:
+            key = next((k for k, s in self.watcher.history.seen.items() if s is seen), "")
+        return self.watcher.names.get(key, seen.name)
+
+    def _name_cell(self, key, seen, tip, color=None):
+        custom = self.watcher.names.get(key)
+        it = _item(custom or seen.name,
+                   ((f"Nom choisi. Nom annoncé : {seen.name}\n" if custom else "")
+                    + tip + "\nDouble-clic ou clic droit : renommer"), color)
+        if custom:
+            font = it.font()
+            font.setBold(True)
+            it.setFont(font)
+        it.setData(Qt.UserRole, key)
+        return it
+
+    def _key_at(self, table, row):
+        it = table.item(row, 1)
+        return it.data(Qt.UserRole) if it is not None else None
+
+    def _context_menu(self, table, pos):
+        key = self._key_at(table, table.rowAt(pos.y())) if table.rowAt(pos.y()) >= 0 else None
+        if key is None:
+            return
+        menu = QMenu(self)
+        menu.addAction("Renommer…", lambda: self.rename(key))
+        if self.watcher.names.get(key):
+            menu.addAction("Reprendre le nom annoncé", lambda: self._set_name(key, ""))
+        menu.exec(table.viewport().mapToGlobal(pos))
+
+    def rename(self, key):
+        seen = self.watcher.history.seen.get(key)
+        if key is None or seen is None:
+            return
+        name, ok = QInputDialog.getText(
+            self, "Renommer le périphérique",
+            f"Nom pour « {seen.name} » (vide : reprendre ce nom annoncé) :",
+            text=self.watcher.names.get(key, seen.name))
+        if ok:
+            self._set_name(key, "" if name.strip() == seen.name else name)
+
+    def _set_name(self, key, name):
+        try:
+            self.watcher.names.set(key, name)
+        except OSError as e:
+            self._journal(f"nom non enregistré : {e}")
+            return
+        seen = self.watcher.history.seen.get(key)
+        self._journal(f"renommé : {seen.name if seen else key} → {self.display(seen, key)}")
+        self.fill()
+        self.renamed.emit(key)
 
     def fill(self):
         rows = self.rows()
@@ -223,7 +291,7 @@ class PeripheriquesPage(QMainWindow):
         self.tabs.setTabText(1, f"Wifi (IOCP) ({w})")
         self.fill_network()
         self.table.setRowCount(len(rows))
-        for r, (seen, dev) in enumerate(rows):
+        for r, (key, seen, dev) in enumerate(rows):
             state = dev.access if dev is not None else "absent"
             color, label = STATES[state]
             grey = STATES["absent"][0] if dev is None else None
@@ -234,14 +302,14 @@ class PeripheriquesPage(QMainWindow):
                 tip = "\n".join(f"{x.path} ({x.kind}) : {'accessible' if x.access else 'refusé'}"
                                 f"{'' if x in dev.useful_nodes else ' — non utilisé par Pepit'}"
                                 for x in dev.nodes)
-                cells = [dot, _item(seen.name, f"{seen.name}\nclé : {dev.key}"), self._access_cell(dev),
+                cells = [dot, self._name_cell(key, seen, f"clé : {key}"), self._access_cell(dev),
                          _item(seen.pepit), _item(seen.vid_pid), _item(dev.port),
                          _item(dev.speed_label), _item(f"{dev.max_power} mA"),
                          _item(f"{seen.plugs} fois"), _item(seen.first), _item("maintenant"),
                          _item(nodes, tip or None)]
             else:
                 ports = ", ".join(seen.ports)
-                cells = [dot, _item(seen.name, f"{seen.name}\nports vus : {ports}", grey),
+                cells = [dot, self._name_cell(key, seen, f"ports vus : {ports}", grey),
                          _item("", None, grey),
                          _item(seen.pepit, None, grey), _item(seen.vid_pid, None, grey),
                          _item(seen.ports[-1] if seen.ports else "", f"ports vus : {ports}", grey),
@@ -266,11 +334,11 @@ class PeripheriquesPage(QMainWindow):
             " de carte wifi. Les cartes déjà vues restent dans l'historique.")
         rows = self.rows("wifi")
         self.net_table.setRowCount(len(rows))
-        for r, (seen, dev) in enumerate(rows):
+        for r, (key, seen, dev) in enumerate(rows):
             x = seen.extra
             if dev is not None:
                 color, label = NET_STATES["ok" if dev.cards else "inconnue"]
-                cells = [_item("●", label, color), _item(seen.name, f"clé : {dev.key}"),
+                cells = [_item("●", label, color), self._name_cell(key, seen, f"clé : {key}"),
                          _item(", ".join(dev.cards) or "—"), _item(x.get("variables", "")),
                          _item(dev.ip, f"ports IOCP : {dev.tcp_port}"), _item(dev.mac),
                          _item(dev.vendor), _item(f"{seen.plugs} fois"), _item(seen.first),
@@ -278,7 +346,8 @@ class PeripheriquesPage(QMainWindow):
             else:
                 grey, label = NET_STATES["absent"]
                 ips = ", ".join(seen.ports)
-                cells = [_item("●", label, grey), _item(seen.name, None, grey),
+                cells = [_item("●", label, grey),
+                         self._name_cell(key, seen, f"adresses vues : {ips}", grey),
                          _item(x.get("cartes", ""), None, grey),
                          _item(x.get("variables", ""), None, grey),
                          _item(seen.ports[-1] if seen.ports else "", f"adresses vues : {ips}", grey),

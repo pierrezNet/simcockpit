@@ -179,6 +179,13 @@ def scan(sysfs=SYSFS, dev=DEV):
     return out
 
 
+def key_for(vid_pid, port, sysfs=SYSFS):
+    """Clé (comme UsbDevice.key) du périphérique de ce VID:PID branché sur cette prise :
+    pour retrouver le nom donné à une carte depuis la page Cartes."""
+    serial = _read(os.path.join(sysfs, port, "serial")) if port else ""
+    return f"{vid_pid}:{serial}" if serial else f"{vid_pid}@{port}"
+
+
 # ---------------------------------------------------------------- historique
 def state_dir():
     base = os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state")

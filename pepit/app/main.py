@@ -92,6 +92,7 @@ class Pepit(QObject):
                 window = MainWindow(self.hub)
             else:
                 window = PeripheriquesPage(self.usb)
+                window.renamed.connect(self._renamed)
             window.installEventFilter(self._hide_filter)
             self.pages[name] = window
         return window
@@ -117,6 +118,10 @@ class Pepit(QObject):
         fields = instance.decode(line)
         if len(fields) >= 2 and fields[0] == "afficher" and fields[1] in PAGES:
             self.show(fields[1], fields[2] if len(fields) > 2 else None)
+
+    def _renamed(self, key):
+        if "cartes" in self.pages:
+            self.pages["cartes"].refresh_names(key)
 
     def _network(self):
         """Cartes wifi connectées aux serveurs IOCP du cockpit, pour la page Périphériques."""

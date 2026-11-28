@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QHBoxLayout, QLabel, QLi
                                QListWidgetItem, QMainWindow, QPushButton, QSplitter,
                                QStackedWidget, QVBoxLayout, QWidget)
 
+from ..hw import usb
 from ..hw.hub import DeviceHub
+from ..hw.names import Names
 from .card_view import CardView
 from .qtenv import prepare
 from .winstate import remember
@@ -49,6 +51,7 @@ class MainWindow(QMainWindow):
         remember(self, "banc_de_test", (1200, 700))   # position et taille mémorisées
         self.settings = QSettings("pepit", "app")
         self.views = {}  # clé de la carte -> CardView
+        self.names = Names()     # noms donnés dans la page Périphériques
         self.dots = {state: dot(color) for state, color in DOTS.items()}
 
         central = QWidget()
@@ -111,6 +114,7 @@ class MainWindow(QMainWindow):
         self.list.blockSignals(True)
         self.list.clear()
         self.list.blockSignals(False)
+        self.names.load()
         cards = self.hub.refresh()
         if not cards:
             self.found.setText("Aucune carte de cockpit détectée.")
@@ -124,7 +128,7 @@ class MainWindow(QMainWindow):
             view = CardView(d, self.hub)
             self.stack.addWidget(view)
             self.views[key] = view
-            item = QListWidgetItem(f"{d.label.split(' (')[0]}\nport {d.info.usb_port}")
+            item = QListWidgetItem(self._label(d))
             item.setData(ROLE_KEY, key)
             self.list.addItem(item)
             view.activity.connect(lambda v=view: self._follow(v))
@@ -138,11 +142,27 @@ class MainWindow(QMainWindow):
         item = self.list.currentItem()
         return item.data(ROLE_KEY) if item is not None else None
 
+    def _label(self, d):
+        """Nom donné dans la page Périphériques, sinon le type de carte ; puis la prise."""
+        name = self.names.get(usb.key_for(d.info.vid_pid, d.info.usb_port))
+        return f"{name or d.label.split(' (')[0]}\nport {d.info.usb_port}"
+
+    def refresh_names(self, _key=None):
+        """Un périphérique a été renommé : les lignes reprennent leurs noms."""
+        self.names.load()
+        for r in range(self.list.count()):
+            item = self.list.item(r)
+            view = self.views.get(item.data(ROLE_KEY))
+            if view is not None:
+                item.setText(self._label(view.detected))
+                self._paint(view, item)
+
     def _paint(self, view, item):
         state, detail = view.health()
         item.setIcon(self.dots[state])
         d = view.detected
-        item.setToolTip(f"{d.label}\n{d.info.path}, port {d.info.usb_port}\n{detail}")
+        item.setToolTip(f"{d.label}\n{d.info.path}, port {d.info.usb_port}\n{detail}"
+                        "\n(nom : clic droit dans la page Périphériques)")
 
     def _select(self, item, _previous=None):
         if item is None:

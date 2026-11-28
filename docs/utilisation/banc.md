@@ -15,7 +15,7 @@ La page Cartes, le banc de test, montre les cartes **telles qu'elles sont**, san
 - **bleu clair** : lue par le cockpit, pour une carte à laquelle rien n'est jamais écrit (manettes des gaz) ;
 - **rouge** : en erreur (accès refusé, carte perdue, bus FDBUS qui ne répond pas). Le détail s'affiche au survol.
 
-La carte choisie s'affiche à droite. La liste défile quel que soit le nombre de cartes, et la carte choisie est retenue d'un lancement à l'autre. Avec « Suivre la carte actionnée », la carte dont on vient d'actionner une commande est choisie toute seule.
+Une carte nommée dans la [page Périphériques](peripheriques.md#nommer-un-peripherique) apparaît sous ce nom. La carte choisie s'affiche à droite. La liste défile quel que soit le nombre de cartes, et la carte choisie est retenue d'un lancement à l'autre. Avec « Suivre la carte actionnée », la carte dont on vient d'actionner une commande est choisie toute seule.
 
 Une carte branchée ou débranchée apparaît ou disparaît d'elle-même. « Rechercher les cartes » relit la liste à la demande.
 
