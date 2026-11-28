@@ -21,6 +21,7 @@ SYSFS = "/sys/bus/usb/devices"
 DEV = "/dev"
 _DEVICE = re.compile(r"^\d+-[\d.]+$")              # « 1-4.4 » : un périphérique (pas « 1-4:1.0 »)
 _NODE = re.compile(r"^(hidraw\d+|event\d+|ttyUSB\d+|ttyACM\d+)$")
+_JOYSTICK = re.compile(r"^js\d+$")                  # joydev : le noyau y voit un joystick
 SPEEDS = {"1.5": "1,5 Mbit/s (low)", "12": "12 Mbit/s (full)", "480": "480 Mbit/s (high)",
           "5000": "5 Gbit/s", "10000": "10 Gbit/s", "20000": "20 Gbit/s"}
 CLASSES = {"09": "concentrateur USB", "0e": "caméra", "01": "audio", "08": "stockage",
@@ -50,6 +51,7 @@ class UsbDevice:
     max_power: int     # mA demandés au port
     device_class: str  # « 09 » = concentrateur
     nodes: tuple = ()
+    joystick: bool = False   # joystick, manette des gaz, palonnier… (nœud js du noyau)
 
     @property
     def vid_pid(self):
@@ -72,8 +74,10 @@ class UsbDevice:
 
     @property
     def cockpit(self):
-        """Carte de cockpit : modèle connu de Pepit ou fabricant de cockpit."""
-        return self.card_type is not UNKNOWN or maker(self.manufacturer) is not None
+        """Matériel de simulation : carte connue de Pepit, fabricant de cockpit, ou
+        joystick (manche, manette des gaz, palonnier), quel que soit son fabricant."""
+        return (self.card_type is not UNKNOWN or maker(self.manufacturer) is not None
+                or self.joystick)
 
     @property
     def pepit(self):
@@ -82,6 +86,8 @@ class UsbDevice:
             return self.card_type.label
         if maker(self.manufacturer):
             return f"{maker(self.manufacturer)} (non pris en charge)"
+        if self.joystick:
+            return "joystick (lu par le simulateur)"
         return CLASSES.get(self.device_class, "")
 
     @property
@@ -98,6 +104,8 @@ class UsbDevice:
         connue ; tous pour un périphérique qu'il ne connaît pas."""
         t = self.card_type
         if t is UNKNOWN:
+            if self.joystick:            # un joystick se lit par evdev, comme la TCA
+                return tuple(n for n in self.nodes if n.kind == "evdev")
             return self.nodes
         want = "evdev" if t.protocol == "evdev" else "hidraw"
         return tuple(n for n in self.nodes if n.kind == want)
@@ -125,18 +133,20 @@ def _dev_path(name, dev):
 
 
 def _nodes(devdir, dev):
-    """Nœuds /dev exposés par ce périphérique (pas par ceux branchés derrière lui)."""
-    found = {}
+    """Nœuds /dev exposés par ce périphérique (pas par ceux branchés derrière lui),
+    et s'il s'agit d'un joystick."""
+    found, joystick = {}, False
     for here, dirs, _files in os.walk(devdir):     # les liens (driver, subsystem…) sont ignorés
         dirs[:] = [d for d in dirs if not _DEVICE.match(d)]   # périphérique enfant : à part
         for d in dirs:
+            joystick = joystick or bool(_JOYSTICK.match(d))
             if _NODE.match(d) and d not in found:
                 kind = ("hidraw" if d.startswith("hidraw") else
                         "evdev" if d.startswith("event") else "serie")
                 path = _dev_path(d, dev)
                 mode = os.R_OK if kind == "evdev" else os.R_OK | os.W_OK
                 found[d] = Node(path, kind, os.access(path, mode))
-    return tuple(sorted(found.values(), key=lambda n: (n.kind, n.path)))
+    return tuple(sorted(found.values(), key=lambda n: (n.kind, n.path))), joystick
 
 
 def _power(text):
@@ -155,6 +165,7 @@ def scan(sysfs=SYSFS, dev=DEV):
         if not _DEVICE.match(name):
             continue
         d = os.path.join(sysfs, name)
+        nodes, joystick = _nodes(os.path.realpath(d), dev)
         out.append(UsbDevice(
             port=name, vid=_read(os.path.join(d, "idVendor")) or "????",
             pid=_read(os.path.join(d, "idProduct")) or "????",
@@ -164,7 +175,7 @@ def scan(sysfs=SYSFS, dev=DEV):
             speed=_read(os.path.join(d, "speed")),
             max_power=_power(_read(os.path.join(d, "bMaxPower"))),
             device_class=_read(os.path.join(d, "bDeviceClass")),
-            nodes=_nodes(os.path.realpath(d), dev)))
+            nodes=nodes, joystick=joystick))
     return out
 
 

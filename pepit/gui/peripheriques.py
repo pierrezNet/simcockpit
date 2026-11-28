@@ -87,7 +87,7 @@ class PeripheriquesPage(QMainWindow):
         lay = QVBoxLayout(body)
         bar = QHBoxLayout()
         self.summary = QLabel()
-        self.only_cockpit = QCheckBox("Cartes de cockpit seulement")
+        self.only_cockpit = QCheckBox("Matériel de simulation seulement")
         self.only_cockpit.setChecked(self.settings.value("peripheriques/cockpit", False, bool))
         self.show_absent = QCheckBox("Montrer les débranchés")
         self.show_absent.setChecked(self.settings.value("peripheriques/debranches", True, bool))

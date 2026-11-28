@@ -73,6 +73,15 @@ class TestScan(unittest.TestCase):
         self.assertEqual({n.kind for n in dev.nodes}, {"hidraw", "evdev"})
         self.assertEqual(dev.access, "ok")              # hidraw fermé, mais inutile à Pepit
 
+    def test_joystick_de_tout_fabricant(self):
+        d = self.fs.device("1-4.1.1", "044f", "0402", "Joystick - HOTAS Warthog", "Thustmaster")
+        self.fs.node(d, "1-4.1.1:1.0/hid/hidraw", "hidraw4", access=False)
+        self.fs.node(d, "1-4.1.1:1.0/hid/input/input23", "event23")
+        os.makedirs(os.path.join(d, "1-4.1.1:1.0/hid/input/input23/js0"))
+        (dev,) = self.fs.scan()
+        self.assertTrue(dev.joystick and dev.cockpit)
+        self.assertEqual(dev.access, "ok")              # evdev ouvert : il fonctionne
+
     def test_inconnu_partiel_ou_refuse(self):
         d = self.fs.device("1-13", "1997", "2433", "mini keyboard")
         self.fs.node(d, "1-13:1.0/hid/hidraw", "hidraw1", access=False)
