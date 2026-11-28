@@ -21,8 +21,38 @@ _EVENT = struct.Struct("llHHi")        # struct input_event (64 bits)
 _ABSINFO = struct.Struct("6i")         # valeur, min, max, fuzz, flat, résolution
 
 
+KEY_MAX = 0x2ff
+_KEYBYTES = (KEY_MAX + 8) // 8         # 96 octets : un bit par code de touche ou bouton
+
+
 def _eviocgabs(axis):
     return (2 << 30) | (_ABSINFO.size << 16) | (ord("E") << 8) | (0x40 + axis)
+
+
+def _eviocgkey(size=_KEYBYTES):
+    return (2 << 30) | (size << 16) | (ord("E") << 8) | 0x18
+
+
+def parse_caps(text):
+    """« 7fff 0 … ffff00000000 0 0 » (sysfs, mot de poids fort d'abord) → codes présents."""
+    codes = []
+    for k, word in enumerate(reversed(text.split())):
+        value = int(word, 16)
+        codes += [64 * k + b for b in range(64) if value >> b & 1]
+    return codes
+
+
+def pressed(bitmap, codes):
+    """Bitmap EVIOCGKEY (octets) → {code: 0/1} pour les codes demandés."""
+    return {c: bitmap[c // 8] >> (c % 8) & 1 for c in codes}
+
+
+def _read(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except OSError:
+        return ""
 
 
 def event_node(hidraw_path):
@@ -52,14 +82,17 @@ class EvdevDevice:
         self.fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
         self.ranges = {}                       # axe → (min, max)
         self.initial = {}                      # axe → valeur brute à l'ouverture
-        caps = open(f"/sys/class/input/{os.path.basename(path)}/device/capabilities/abs").read()
-        mask = int(caps.split()[-1], 16)       # mot de poids faible : axes 0 à 63
-        for axis in range(64):
-            if mask >> axis & 1:
+        caps = f"/sys/class/input/{os.path.basename(path)}/device/capabilities/"
+        for axis in parse_caps(_read(caps + "abs")):
+            if axis < 64:
                 value, lo, hi, *_ = _ABSINFO.unpack(fcntl.ioctl(self.fd, _eviocgabs(axis),
                                                                 bytes(_ABSINFO.size)))
                 self.ranges[axis] = (lo, hi)
                 self.initial[axis] = value
+        # boutons (crans, interrupteurs…) : n° d'entrée = rang dans l'ordre des codes
+        self.keys = [c for c in parse_caps(_read(caps + "key")) if c <= KEY_MAX]
+        self.initial_keys = (pressed(fcntl.ioctl(self.fd, _eviocgkey(), bytes(_KEYBYTES)),
+                                     self.keys) if self.keys else {})
 
     def axis_value(self, axis, raw):
         lo, hi = self.ranges.get(axis, (0, 65535))

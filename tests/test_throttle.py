@@ -116,5 +116,25 @@ class TestEvdev(unittest.TestCase):
         self.assertEqual(evdev.normalize(70000, 0, 65535), 1.0)
 
 
+
+
+class TestEvdevBoutons(unittest.TestCase):
+    """Boutons d'un joystick : capacités sysfs et état initial (relevés sur la TCA)."""
+
+    def test_capacites_de_la_tca(self):
+        from pepit.hw.evdev import parse_caps
+        codes = parse_caps("7fff 0 0 0 0 0 0 ffff00000000 0 0 0 0\n")
+        self.assertEqual(len(codes), 31)
+        self.assertEqual(codes[:2], [0x120, 0x121])          # BTN_TRIGGER, BTN_THUMB
+        self.assertEqual(codes[-1], 0x2ce)                     # BTN_TRIGGER_HAPPY15
+        self.assertEqual(parse_caps("7f"), list(range(7)))     # 7 axes
+
+    def test_etat_initial(self):
+        from pepit.hw.evdev import pressed
+        bitmap = bytearray(96)
+        bitmap[0x12b // 8] |= 1 << (0x12b % 8)                 # interrupteur déjà sur ON
+        self.assertEqual(pressed(bytes(bitmap), [0x120, 0x12b]), {0x120: 0, 0x12b: 1})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -208,20 +208,36 @@ class Card:
             self._emit("error", value=str(e))
 
     def _run_evdev(self):
-        """Axes en 0..1 (« axis » : index = n° d'axe evdev) ; position initiale émise d'emblée."""
+        """Axes en 0..1 (« axis » : index = n° d'axe evdev) ; boutons en entrées (« input »,
+        index = rang du bouton), déjà anti-rebondis par le noyau. Positions initiales
+        (interrupteurs compris) émises d'emblée."""
         dev = self.dev
+        slot = {code: i for i, code in enumerate(dev.keys[:mastercard.INPUTS])}
+        state = [0] * mastercard.INPUTS
+        for code, i in slot.items():
+            state[i] = dev.initial_keys.get(code, 0)
         try:
             for axis, raw in sorted(dev.initial.items()):
                 self.axes[axis] = dev.axis_value(axis, raw)
                 self._emit("axis", index=axis, value=self.axes[axis])
-            self._emit("ready", value=[0] * mastercard.INPUTS)
+            if self.state_events:
+                self._emit("state", value=list(state))
+            self._emit("ready", value=list(state))
             while not self._stop.is_set():
+                changed = False
                 for typ, code, raw in dev.read(timeout=0.05):
                     if typ == evdev.EV_ABS:
                         value = dev.axis_value(code, raw)
                         if self.axes.get(code) != value:
                             self.axes[code] = value
                             self._emit("axis", index=code, value=value)
+                    elif typ == evdev.EV_KEY and code in slot and raw in (0, 1):
+                        i = slot[code]                       # raw 2 = répétition : ignorée
+                        if state[i] != raw:
+                            old, state[i], changed = state[i], raw, True
+                            self._emit("input", index=i, value=raw, old=old)
+                if changed and self.state_events:
+                    self._emit("state", value=list(state))
         except OSError as e:
             self._emit("error", value=str(e))
 

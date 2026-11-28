@@ -95,21 +95,31 @@ class CardView(QWidget):
         root.addLayout(top, 1)
 
         # --- entrées
-        box = QGroupBox("Entrées (numéros SIOC) — vert = écartée du repos, orange = vient de changer")
+        is_evdev = detected.type.protocol == "evdev"
+        keys = list(getattr(self.card.dev, "keys", ())) if is_evdev else []
+        box = QGroupBox(("Boutons et interrupteurs" if is_evdev else "Entrées (numéros SIOC)")
+                        + " — vert = écartée du repos, orange = vient de changer")
         grid = QGridLayout(box)
         grid.setSpacing(4)
         self.cells = []
-        # Master/EFDE : 8 groupes de 9 entrées ; MCP (bitmap) : 8 octets de 8 bits
-        per_row, row_name = (8, "octet") if detected.type.protocol == "bitmap" else (9, "groupe")
-        n_inputs = 0 if detected.type.protocol == "keys" else min(detected.type.inputs,
-                                                                   mastercard.INPUTS)
+        # Master/EFDE : 8 groupes de 9 entrées ; MCP (bitmap) : 8 octets de 8 bits ;
+        # joystick (evdev) : ses boutons, 8 par ligne, numérotés dans l'ordre des codes
+        per_row, row_name = ((8, "octet") if detected.type.protocol == "bitmap" else
+                             (8, "boutons") if is_evdev else (9, "groupe"))
+        n_inputs = (0 if detected.type.protocol == "keys" else
+                    min(len(keys), mastercard.INPUTS) if is_evdev else
+                    min(detected.type.inputs, mastercard.INPUTS))
         for row in range(-(-n_inputs // per_row)):
             is_dme = detected.type.protocol == "dme"
-            grid.addWidget(QLabel("SEL, PWR" if is_dme else f"{row_name} {row}"), row, 0)
+            first = per_row * row
+            grid.addWidget(QLabel("SEL, PWR" if is_dme else
+                                  f"{first} à {min(first + per_row, n_inputs) - 1}" if is_evdev
+                                  else f"{row_name} {row}"), row, 0)
             for b in range(min(per_row, n_inputs - per_row * row)):
                 i = per_row * row + b
                 cell = Cell(str(i))
-                cell.setToolTip(f"Entrée {i} ({row_name} {row}, bit {b})")
+                cell.setToolTip(f"Bouton {i} (code evdev {keys[i]}, {keys[i]:#x})" if is_evdev
+                                else f"Entrée {i} ({row_name} {row}, bit {b})")
                 grid.addWidget(cell, row, b + 1)
                 self.cells.append(cell)
         if n_inputs:
@@ -131,15 +141,18 @@ class CardView(QWidget):
         abox = QGroupBox("Entrées analogiques")
         alay = QGridLayout(abox)
         self.axes = {}
-        for n in range(1, detected.type.axes + 1):
+        # Master/EFDE : axes n° 1 à N, de 0 à 255 ; joystick : axes evdev (n° 0…), de 0 à 1
+        numbers = (sorted(getattr(self.card.dev, "ranges", {})) if is_evdev
+                   else range(1, detected.type.axes + 1))
+        for row, n in enumerate(numbers):
             bar = QProgressBar()
-            bar.setRange(0, 255)
+            bar.setRange(0, 1000 if is_evdev else 255)
             bar.setFormat("%v")
-            alay.addWidget(QLabel(f"#{n}"), n, 0)
-            alay.addWidget(bar, n, 1)
+            alay.addWidget(QLabel(f"axe {n}" if is_evdev else f"#{n}"), row, 0)
+            alay.addWidget(bar, row, 1)
             self.axes[n] = bar
         side.addWidget(abox)
-        abox.setVisible(detected.type.axes > 0)
+        abox.setVisible(bool(self.axes))
 
         # --- sorties (verrouillées)
         obox = QGroupBox("Sorties (numéros SIOC)")
@@ -657,7 +670,12 @@ class CardView(QWidget):
             self.last.setText(f"Entrée {ev.index} {verb}")
             self._log(f"{ev.t:8.2f} s   entrée {ev.index:2d} {verb}")
         elif ev.kind == "axis" and ev.index in self.axes:
-            self.axes[ev.index].setValue(ev.value)
+            bar = self.axes[ev.index]
+            if isinstance(ev.value, float):        # joystick : 0..1, trois décimales
+                bar.setValue(round(ev.value * 1000))
+                bar.setFormat(f"{ev.value:.3f}")
+            else:
+                bar.setValue(ev.value)
         elif ev.kind == "error":
             self.timer.stop()
             self.status.setText(f"Carte perdue ({ev.value}). Rebranchez puis « Rechercher ».")
