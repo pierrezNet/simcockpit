@@ -52,6 +52,8 @@ class OutputCell(QPushButton):
 class CardView(QWidget):
     # une commande de la carte vient d'être actionnée (entrée ou touche ; pas les axes)
     activity = Signal()
+    # l'état de la carte a changé (voir health()) : pastille de la liste des cartes
+    health_changed = Signal()
 
     def __init__(self, detected, hub, parent=None):
         super().__init__(parent)
@@ -59,6 +61,7 @@ class CardView(QWidget):
         self.hub = hub
         self.events = None        # abonnement à la carte (partagée avec le cockpit)
         self._drivers = None
+        self.problem = None       # texte de l'erreur en cours (ouverture, carte perdue, bus)
         try:                      # la carte est ouverte par le concentrateur, une seule fois
             self.card, self.open_error = hub.open(detected), None
         except OSError as e:      # PermissionError comprise : affichée par start()
@@ -534,6 +537,7 @@ class CardView(QWidget):
             if self.open_error is not None:
                 raise self.open_error
         except PermissionError:
+            self._set_problem("accès refusé (règle udev manquante)")
             self.status.setText(
                 f"Accès refusé à {self.detected.info.path} : installez la règle udev"
                 " (voir udev/99-pepit.rules) puis débranchez/rebranchez la carte.")
@@ -543,6 +547,7 @@ class CardView(QWidget):
             return
         except OSError as e:
             self.status.setText(f"Impossible d'ouvrir {self.detected.info.path} : {e}")
+            self._set_problem(f"impossible d'ouvrir : {e}")
             return
         self.status.setText(f"{self.card.name} — {self.detected.info.path} — en attente de l'état…")
         self.events = self.card.listen()      # l'état courant arrive en premier
@@ -562,11 +567,25 @@ class CardView(QWidget):
         """Le cockpit pilote-t-il cette carte ? (ses sorties, ses afficheurs)"""
         return "cockpit" in self.hub.drivers(self.card)
 
+    def health(self):
+        """(état, détail) : « erreur », « pilotée » (par le cockpit) ou « connectée »."""
+        if self.problem:
+            return "erreur", self.problem
+        if self._drivers and "cockpit" in self._drivers:
+            return "pilotée", "pilotée par le cockpit"
+        return "connectée", "connectée"
+
+    def _set_problem(self, text):
+        if text != self.problem:
+            self.problem = text
+            self.health_changed.emit()
+
     def _show_drivers(self):
         drivers = self.hub.drivers(self.card)
         if drivers == self._drivers:
             return
         self._drivers = drivers
+        self.health_changed.emit()
         if "cockpit" in drivers:
             self.banner.setText("Carte pilotée par le cockpit (page Simulateur) : ce que vous"
                                 " écrivez ici sera remplacé par ses propres sorties.")
@@ -594,6 +613,12 @@ class CardView(QWidget):
                 self._paint(i)
 
     def handle(self, ev):
+        if ev.kind == "error":
+            self._set_problem(f"carte perdue : {ev.value}")
+        elif ev.kind == "init_failed":
+            self._set_problem(f"bus : {ev.value}")
+        elif ev.kind == "ready":
+            self._set_problem(None)
         if self.detected.type.protocol == "fdbus":
             self.fd_view.handle(ev)
             return
