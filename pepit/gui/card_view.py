@@ -270,7 +270,8 @@ class CardView(QWidget):
                 row.addWidget(bb)
             row.addStretch()
             mlay.addLayout(row)
-            note = QLabel("Les afficheurs ne restent allumés que tant que cette fenêtre lit la carte.")
+            note = QLabel("Les afficheurs ne restent allumés que tant que Pepit lit la carte"
+                          " (fenêtre fermée comprise, jusqu'à « Quitter Pepit »).")
             note.setStyleSheet("color:#999;")
             mlay.addWidget(note)
             side.addWidget(mbox)
