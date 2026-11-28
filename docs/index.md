@@ -1,35 +1,115 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
+<div class="pepit-hero" markdown>
+
+<div markdown>
+
 # Pepit
 
-**Pepit** pilote, sous **Linux**, les cartes d'interface d'un cockpit de simulateur de vol et les relie à **X-Plane 12**. C'est une alternative libre à SIOC, le logiciel d'OpenCockpits, qui ne fonctionne que sous Windows.
+<p class="pepit-hero__lede">Le SIOC libre pour Linux : vos cartes OpenCockpits, EFDE et Arduino, reliées à X-Plane 12, sans plugin. Le cockpit se décrit en YAML.</p>
 
-Pepit est écrit en Python et décrit le cockpit dans de simples fichiers YAML.
+<div class="pepit-hero__buttons" markdown>
+[Installer](demarrage/installation.md){ .md-button .md-button--primary }
+[Premiers pas](demarrage/premiers-pas.md){ .md-button }
+[GitHub](https://github.com/pierrezNet/pepit){ .md-button }
+</div>
+
+<ul class="pepit-hero__tags">
+<li>Linux</li><li>X-Plane 12</li><li>OpenCockpits</li><li>EFDE</li><li>Arduino / ESP</li><li>GPL-3.0</li>
+</ul>
+
+</div>
+
+<div class="pepit-hero__panel">
+<img src="assets/mcp.svg" alt="Façade de MCP allumée : course 045, vitesse 250, cap 310, altitude 17400, vitesse verticale -1200, modes HDG SEL, ALT HLD et CMD A engagés">
+</div>
+
+</div>
 
 ## Ce que fait Pepit
 
-- **Détecte et classe** les cartes branchées en USB (OpenCockpits, EFDE, manettes Thrustmaster) et accueille les cartes **wifi** écrites pour SIOC (Arduino, ESP8266, ESP32).
-- **Montre en direct** chaque entrée (interrupteurs, poussoirs, encodeurs, axes) et permet de tester les sorties (voyants, afficheurs, aiguilles de jauges) : c'est le [banc de test](utilisation/banc.md).
-- **Exécute la logique du cockpit** décrite en YAML : transpondeur, pilote automatique, radios, CDU, jauges, manettes des gaz. C'est le [cockpit](utilisation/cockpit.md).
-- **Se relie à X-Plane 12** sans plugin, par son protocole UDP et son API web locale.
+<div class="grid cards" markdown>
+
+-   :material-usb-port:{ .lg .middle } **Vos cartes, reconnues**
+
+    ---
+
+    OpenCockpits, EFDE, manettes Thrustmaster : détectées à leur branchement, sans pilote à installer, et vérifiées entrée par entrée au banc de test.
+
+    [:octicons-arrow-right-24: Cartes prises en charge](materiel/cartes.md)
+
+-   :material-airplane-takeoff:{ .lg .middle } **Reliées à X-Plane 12**
+
+    ---
+
+    MCP, CDU et son écran, radio, transpondeur, jauges, manettes des gaz : profils complets du BAe 146 et du Boeing 737-800.
+
+    [:octicons-arrow-right-24: Le cockpit et X-Plane](utilisation/cockpit.md)
+
+-   :material-wifi:{ .lg .middle } **Cartes wifi de SIOC**
+
+    ---
+
+    Les cartes Arduino et ESP écrites pour SIOC se connectent à Pepit comme à SIOC (protocole IOCP) : afficheurs, écran à encre.
+
+    [:octicons-arrow-right-24: Cartes wifi](materiel/cartes-wifi.md)
+
+-   :material-file-cog-outline:{ .lg .middle } **Un cockpit en YAML**
+
+    ---
+
+    Sélecteurs, encodeurs, voyants, jauges : chaque pièce se décrit en quelques lignes, avec des noms de fonctions lisibles.
+
+    [:octicons-arrow-right-24: Types de commandes](configuration/types.md)
+
+</div>
+
+## Trois couches, une méthode
+
+Chaque pièce du cockpit suit le même chemin. Changer d'avion, ou un jour de simulateur, ne touche que la dernière étape.
+
+```mermaid
+flowchart LR
+    A["Matériel<br/><small>carte et voie<br/>vérifiées au banc</small>"] --> B["Logique<br/><small>instrument en YAML<br/>sans parler du simulateur</small>"]
+    B --> C["Dictionnaire<br/><small>transpondeur.code,<br/>pa.mode.hdg…</small>"]
+    C --> D["X-Plane 12<br/><small>datarefs<br/>et commandes</small>"]
+```
+
+[:octicons-arrow-right-24: Le dictionnaire des fonctions](configuration/dictionnaire.md)
+
+## Démarrer en trois commandes
+
+<div class="pepit-steps" markdown>
+
+1.  **Voir les cartes branchées**
+
+    ```sh
+    bin/pepit list
+    ```
+
+2.  **Les tester au banc** : chaque entrée s'allume quand on l'actionne, chaque sortie se commande.
+
+    ```sh
+    bin/pepit-banc
+    ```
+
+3.  **Lancer le cockpit**, relié à X-Plane :
+
+    ```sh
+    bin/pepit-cockpit config/avions/bae146-jf
+    ```
+
+</div>
 
 ## Deux façons de s'en servir
 
-**Clé en main.** Vous avez le même matériel et le même avion qu'un profil existant ? Branchez, installez, lancez : les profils du [BAe 146](avions/bae146.md) et du [Boeing 737-800](avions/b737.md) relient déjà le MCP, le CDU, la radio, le transpondeur, les jauges et les manettes.
+**Clé en main.** Vous avez le même matériel et le même avion qu'un profil existant : branchez, installez, lancez. Les profils du [BAe 146](avions/bae146.md) et du [Boeing 737-800](avions/b737.md) relient déjà le MCP, le CDU, la radio, le transpondeur, les jauges et les manettes.
 
-**Une méthode pour votre cockpit.** Votre matériel ou votre avion sont différents ? Pepit sépare trois couches, et chaque pièce suit le même chemin :
-
-1. **le matériel** : la carte et la voie où la pièce est branchée, vérifiées au banc de test ;
-2. **la logique** : ce que fait la pièce (un sélecteur, un encodeur, une jauge), décrit en YAML sans parler du simulateur ;
-3. **le simulateur** : le [dictionnaire des fonctions](configuration/dictionnaire.md) traduit « transpondeur.code » ou « pa.mode.hdg » en dataref ou en commande.
-
-Changer d'avion ou de simulateur ne touche que la troisième couche.
-
-## Par où commencer
-
-- [Installer Pepit](demarrage/installation.md) sur Ubuntu ou Debian.
-- Suivre les [premiers pas](demarrage/premiers-pas.md) : une carte, un interrupteur, un voyant, puis X-Plane.
-- Voir les [cartes prises en charge](materiel/cartes.md).
+**Une méthode pour votre cockpit.** Votre matériel ou votre avion sont différents : les [premiers pas](demarrage/premiers-pas.md) montrent le chemin d'une pièce, du banc de test jusqu'à X-Plane, et chaque profil existant sert de modèle.
 
 !!! note "État du projet"
-    Pepit sert chaque jour sur un cockpit réel, mais reste un projet personnel. Les protocoles ont été retrouvés par rétro-ingénierie sur du matériel réel, ou communiqués par les fabricants. Pepit n'est affilié ni à OpenCockpits, ni à EFDE, ni à Laminar Research.
-
-Le code est sur [GitHub](https://github.com/pierrezNet/pepit), sous licence GPL-3.0-or-later.
+    Pepit tourne sur un cockpit réel, mais reste un projet personnel. Les protocoles ont été retrouvés sur du matériel réel ou communiqués par les fabricants. Pepit n'est affilié ni à OpenCockpits, ni à EFDE, ni à Laminar Research.
