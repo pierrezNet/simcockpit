@@ -3,7 +3,8 @@
 - Simulateur : le cockpit (logique et liaison X-Plane). Il est créé au démarrage et tourne
   même fenêtre cachée.
 - Cartes : le banc de test, créé à la première demande.
-- Périphériques : l'état des périphériques USB (en préparation).
+- Périphériques : les périphériques USB, leur accès et leur historique. Le veilleur
+  tourne dès le démarrage, pour que l'historique soit tenu même page fermée.
 
 Fermer une fenêtre la cache ; seul « Quitter Pepit » (icône de la barre du haut) arrête
 tout. Sans barre d'icônes disponible, fermer la dernière fenêtre arrête Pepit.
@@ -17,12 +18,11 @@ from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, QSettings, Qt
 from PySide6.QtGui import QAction, QIcon
-from PySide6.QtWidgets import (QApplication, QLabel, QMainWindow, QMenu, QSystemTrayIcon,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
+from ..gui.peripheriques import PeripheriquesPage, UsbWatcher
 from ..gui.qtenv import prepare
 from ..hw.hub import DeviceHub
-from ..gui.winstate import remember
 from . import instance
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -60,24 +60,6 @@ class _HideOnClose(QObject):
         return False
 
 
-class PeripheriquesPage(QMainWindow):
-    """En préparation : liste, surveillance et historique des périphériques USB."""
-
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Pepit — périphériques")
-        remember(self, "peripheriques", (900, 500))
-        body = QWidget()
-        lay = QVBoxLayout(body)
-        text = QLabel("<h2>Périphériques</h2><p>Cette page montrera les périphériques USB"
-                      " branchés, leur port, leur historique et leur accès, avec un bouton"
-                      " « Autoriser ». Elle est en préparation.</p>")
-        text.setWordWrap(True)
-        text.setAlignment(Qt.AlignTop)
-        lay.addWidget(text)
-        self.setCentralWidget(body)
-
-
 class Pepit(QObject):
     def __init__(self, app, profile=None):
         super().__init__()
@@ -85,6 +67,9 @@ class Pepit(QObject):
         self.quitting = False
         self.pages = {}
         self.hub = DeviceHub()               # chaque carte ouverte une fois, pour toutes les pages
+        self.usb = UsbWatcher()              # branchements et historique, en fond
+        self.usb.updated.connect(self.on_usb)
+        self.usb.start()
         self.tray = self._make_tray()
         app.setQuitOnLastWindowClosed(self.tray is None)
         self._hide_filter = _HideOnClose(self)
@@ -103,7 +88,7 @@ class Pepit(QObject):
                 from ..gui.app import MainWindow
                 window = MainWindow(self.hub)
             else:
-                window = PeripheriquesPage()
+                window = PeripheriquesPage(self.usb)
             window.installEventFilter(self._hide_filter)
             self.pages[name] = window
         return window
@@ -124,6 +109,20 @@ class Pepit(QObject):
         fields = instance.decode(line)
         if len(fields) >= 2 and fields[0] == "afficher" and fields[1] in PAGES:
             self.show(fields[1], fields[2] if len(fields) > 2 else None)
+
+    def on_usb(self, changes):
+        """Branchement d'une carte de cockpit : la page Cartes se met à jour, et une
+        bulle prévient si Pepit n'y a pas accès."""
+        cockpit = [(kind, seen, dev) for kind, seen, dev in changes if seen.cockpit]
+        if not cockpit:
+            return
+        if "cartes" in self.pages and any(k != "accès" for k, _s, _d in cockpit):
+            self.pages["cartes"].rescan()
+        refused = [seen.name for kind, seen, dev in cockpit
+                   if dev is not None and dev.access in ("refusé", "partiel")]
+        if refused and self.tray is not None:
+            self.tray.showMessage("Pepit", f"Accès refusé : {', '.join(refused)}."
+                                  " Voir la page Périphériques.", QSystemTrayIcon.Warning, 8000)
 
     # ------------------------------------------------------------ barre du haut
     def _make_tray(self):
@@ -149,6 +148,7 @@ class Pepit(QObject):
 
     def quit(self):
         self.quitting = True
+        self.usb.stop()
         for window in self.pages.values():
             window.close()                   # chacun se désabonne ; le cockpit ferme sa liaison
         self.hub.close()                     # puis les cartes elles-mêmes
