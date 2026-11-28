@@ -1,0 +1,54 @@
+#!/bin/bash
+# Pepit : installation unique des droits matériels. À lancer avec sudo, après l'avoir lu.
+#
+#   sudo bin/pepit-installer                 installe (ou met à jour)
+#   sudo bin/pepit-installer --desinstaller  retire tout ce qui a été installé
+#
+# Ce que fait ce script, et rien d'autre :
+#   1. copie l'assistant udev/pepit-autoriser dans /usr/local/libexec/pepit-autoriser,
+#      propriété de root (0755). Pepit appelle cette copie, jamais celle du dépôt ;
+#   2. copie la règle polkit udev/org.pepit.autoriser.policy dans
+#      /usr/share/polkit-1/actions/ : le bouton « Autoriser » de la page Périphériques
+#      lance l'assistant sans mot de passe, pour l'utilisateur assis devant le PC ;
+#   3. copie la règle des cartes connues udev/99-pepit.rules dans /etc/udev/rules.d/ ;
+#   4. crée /etc/udev/rules.d/70-pepit-autorises.rules (vide) si besoin : l'assistant y
+#      ajoutera une ligne par périphérique autorisé ;
+#   5. demande à udev de relire ses règles.
+set -euo pipefail
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "À lancer avec sudo : sudo $0" >&2
+    exit 1
+fi
+
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+HELPER=/usr/local/libexec/pepit-autoriser
+POLICY=/usr/share/polkit-1/actions/org.pepit.autoriser.policy
+BASE=/etc/udev/rules.d/99-pepit.rules
+ALLOWED=/etc/udev/rules.d/70-pepit-autorises.rules
+
+if [ "${1:-}" = "--desinstaller" ]; then
+    rm -f "$HELPER" "$POLICY"
+    echo "Retirés : $HELPER, $POLICY"
+    echo "Conservés (à retirer à la main si voulu) : $BASE, $ALLOWED"
+    udevadm control --reload
+    exit 0
+fi
+
+install -d -o root -g root -m 0755 /usr/local/libexec
+install -o root -g root -m 0755 "$HERE/udev/pepit-autoriser" "$HELPER"
+install -o root -g root -m 0644 "$HERE/udev/org.pepit.autoriser.policy" "$POLICY"
+install -o root -g root -m 0644 "$HERE/udev/99-pepit.rules" "$BASE"
+if [ ! -e "$ALLOWED" ]; then
+    printf '%s\n' "# Pepit : modèles USB autorisés depuis la page Périphériques (bouton « Autoriser »)." \
+        > "$ALLOWED"
+    chmod 0644 "$ALLOWED"
+fi
+udevadm control --reload
+
+echo "Installé :"
+echo "  $HELPER"
+echo "  $POLICY"
+echo "  $BASE"
+echo "  $ALLOWED"
+echo "Le bouton « Autoriser » de la page Périphériques est prêt (relancez Pepit)."

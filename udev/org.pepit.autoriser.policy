@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- Pepit : bouton « Autoriser » de la page Périphériques.
+     Installé par bin/pepit-installer dans /usr/share/polkit-1/actions/.
+     Sans mot de passe pour l'utilisateur assis devant le PC (session locale active) ;
+     refusé aux sessions distantes (ssh) et inactives. Le programme autorisé est la seule
+     copie installée en root : /usr/local/libexec/pepit-autoriser. -->
+<policyconfig>
+  <vendor>Pepit</vendor>
+  <vendor_url>https://pierreznet.github.io/pepit/</vendor_url>
+  <action id="org.pepit.autoriser">
+    <description>Ouvrir l'accès à un périphérique USB pour Pepit</description>
+    <message>Pepit veut ouvrir l'accès à un périphérique USB de simulation</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/pepit-autoriser</annotate>
+  </action>
+</policyconfig>

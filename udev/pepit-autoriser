@@ -1,0 +1,136 @@
+#!/usr/bin/python3 -I
+"""Pepit : ouvrir (ou refermer) l'accès à un modèle de périphérique USB.
+
+Lancé en root par pkexec, depuis la copie installée par bin/pepit-installer dans
+/usr/local/libexec/pepit-autoriser (jamais depuis le dépôt, modifiable sans root).
+
+    pepit-autoriser ajouter VID PID TYPE [TYPE…]
+    pepit-autoriser retirer VID PID
+
+VID et PID : 4 chiffres hexadécimaux. TYPE : hidraw, serie ou evdev.
+
+Ajoute à /etc/udev/rules.d/70-pepit-autorises.rules une ligne TAG+="uaccess" par type :
+le nœud de ce modèle devient accessible à l'utilisateur assis devant le PC (session
+active), comme une clé USB ou une manette. Le numéro 70 place la règle avant
+73-seat-late.rules, qui applique « uaccess ». Puis udev relit ses règles et
+réapplique les droits aux seuls périphériques de ce modèle déjà branchés.
+
+Python seul, bibliothèque standard, mode isolé (-I) : rien n'est lu de l'environnement
+ni du dossier courant.
+"""
+
+import os
+import re
+import subprocess
+import sys
+
+RULES = "/etc/udev/rules.d/70-pepit-autorises.rules"
+SYSFS = "/sys/bus/usb/devices"
+UDEVADM = "/usr/bin/udevadm"
+HEX4 = re.compile(r"^[0-9a-f]{4}$")
+MATCH = {                                    # type -> début de règle (le sous-système)
+    "hidraw": 'SUBSYSTEM=="hidraw"',
+    "serie": 'SUBSYSTEM=="tty"',
+    "evdev": 'SUBSYSTEM=="input", KERNEL=="event*"',
+}
+HEADER = ("# Pepit : modèles USB autorisés depuis la page Périphériques (bouton « Autoriser »).\n"
+          "# Écrit par /usr/local/libexec/pepit-autoriser. Une ligne par modèle et par type.\n")
+
+
+class Refus(ValueError):
+    pass
+
+
+def check(vid, pid, types=()):
+    vid, pid = vid.lower(), pid.lower()
+    if not HEX4.match(vid) or not HEX4.match(pid):
+        raise Refus("VID et PID : 4 chiffres hexadécimaux")
+    if vid == "0000" and pid == "0000":
+        raise Refus("identifiant vide refusé")
+    for t in types:
+        if t not in MATCH:
+            raise Refus(f"type inconnu : {t!r} (hidraw, serie ou evdev)")
+    return vid, pid
+
+
+def rule(vid, pid, kind):
+    return (f'{MATCH[kind]}, ATTRS{{idVendor}}=="{vid}", ATTRS{{idProduct}}=="{pid}",'
+            f' TAG+="uaccess"  # pepit {vid}:{pid} {kind}')
+
+
+def read_lines(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return f.read().splitlines()
+    except FileNotFoundError:
+        return []
+
+
+def write_lines(path, lines):
+    body = [line for line in lines if not line.startswith("#")]
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(HEADER + "".join(line + "\n" for line in body))
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+
+
+def add(lines, vid, pid, kinds):
+    new = [rule(vid, pid, k) for k in kinds]
+    return lines + [r for r in new if r not in lines]
+
+
+def remove(lines, vid, pid):
+    tag = f"# pepit {vid}:{pid} "
+    return [line for line in lines if tag not in line]
+
+
+def present(vid, pid, sysfs=SYSFS):
+    """Chemins sysfs des périphériques de ce modèle actuellement branchés."""
+    out = []
+    for name in sorted(os.listdir(sysfs)):
+        d = os.path.join(sysfs, name)
+        try:
+            with open(os.path.join(d, "idVendor")) as f:
+                v = f.read().strip()
+            with open(os.path.join(d, "idProduct")) as f:
+                p = f.read().strip()
+        except OSError:
+            continue
+        if (v, p) == (vid, pid):
+            out.append(os.path.realpath(d))
+    return out
+
+
+def apply(vid, pid):
+    subprocess.run([UDEVADM, "control", "--reload"], check=True)
+    for path in present(vid, pid):            # ce modèle seulement, nœuds enfants compris
+        subprocess.run([UDEVADM, "trigger", "--action=change", f"--parent-match={path}"],
+                       check=True)
+    subprocess.run([UDEVADM, "settle", "--timeout=5"], check=False)
+
+
+def main(argv):
+    try:
+        if len(argv) >= 4 and argv[0] == "ajouter":
+            vid, pid = check(argv[1], argv[2], argv[3:])
+            lines = add(read_lines(RULES), vid, pid, argv[3:])
+        elif len(argv) == 3 and argv[0] == "retirer":
+            vid, pid = check(argv[1], argv[2])
+            lines = remove(read_lines(RULES), vid, pid)
+        else:
+            raise Refus("usage : ajouter VID PID TYPE [TYPE…] | retirer VID PID")
+    except Refus as e:
+        print(f"pepit-autoriser : refusé : {e}", file=sys.stderr)
+        return 2
+    if os.geteuid() != 0:
+        print("pepit-autoriser : à lancer en root (pkexec)", file=sys.stderr)
+        return 1
+    write_lines(RULES, lines)
+    apply(vid, pid)
+    print(f"pepit-autoriser : {argv[0]} {vid}:{pid} fait")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
