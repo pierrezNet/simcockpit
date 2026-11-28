@@ -24,7 +24,7 @@ Sans barre d'icônes (certains bureaux), fermer la dernière page arrête Pepit.
 
 ## Les cartes partagées
 
-Chaque carte n'est ouverte qu'une fois, pour toutes les pages : on peut regarder le banc de test pendant que le cockpit tourne, sans que l'un dérange l'autre. Dans la page Cartes, une carte pilotée par le cockpit porte une pastille bleue et un bandeau le rappelle.
+Chaque carte n'est ouverte qu'une fois, pour toutes les pages : on peut regarder le banc de test pendant que le cockpit tourne, sans que l'un dérange l'autre. Dans la page Cartes, une carte pilotée par le cockpit porte une pastille bleue et un bandeau le rappelle ; une carte qu'il ne fait que lire (manettes des gaz), une pastille bleu clair.
 
 ## Démarrer sans fenêtre
 

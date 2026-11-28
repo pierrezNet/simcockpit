@@ -18,8 +18,9 @@ from .qtenv import prepare
 from .winstate import remember
 
 # pastilles : état de la carte -> couleur
-DOTS = {"connectée": "#2e9e44", "pilotée": "#3d8bfd", "erreur": "#e05555"}
-LEGEND = {"connectée": "connectée", "pilotée": "pilotée par le cockpit", "erreur": "erreur"}
+DOTS = {"connectée": "#2e9e44", "pilotée": "#3d8bfd", "lue": "#7fd0e6", "erreur": "#e05555"}
+LEGEND = {"connectée": "connectée", "pilotée": "pilotée par le cockpit",
+          "lue": "lue par le cockpit", "erreur": "erreur"}
 ROLE_KEY = Qt.UserRole      # clé de la carte portée par la ligne
 
 
@@ -67,8 +68,10 @@ class MainWindow(QMainWindow):
 
         self.list = QListWidget()
         self.list.setIconSize(QSize(12, 12))
-        self.list.setMinimumWidth(180)
+        self.list.setMinimumWidth(200)
         self.list.setSpacing(2)
+        self.list.setWordWrap(True)          # nom long (« Thrustmaster TCA Q-Eng 1&2 ») : 2 lignes
+        self.list.setTextElideMode(Qt.ElideNone)
         self.stack = QStackedWidget()
         self.empty = QLabel("Aucune carte de cockpit détectée.\n"
                             "Branchez-la puis « Rechercher les cartes ».")

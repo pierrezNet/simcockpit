@@ -15,7 +15,8 @@ from .fdbus_view import FdbusView
 ACTIVE = "#2e9e44"       # vert : entrée actionnée
 REST = "#3a3f47"         # gris : repos
 RECENT = "#f0a020"       # orange : vient de changer
-BANNER = "#f0c040"       # jaune : carte pilotée par le cockpit
+BANNER = "#f0c040"       # jaune : carte pilotée (écrite) par le cockpit
+READ_BANNER = "#9fd3e0"  # bleu clair : carte seulement lue par le cockpit
 OUT_ON = "#d03030"
 OUT_OFF = "#3a3f47"
 # Délai entre deux trames écrites : le MCP ignore les trames trop rapprochées
@@ -581,11 +582,14 @@ class CardView(QWidget):
         return "cockpit" in self.hub.drivers(self.card)
 
     def health(self):
-        """(état, détail) : « erreur », « pilotée » (par le cockpit) ou « connectée »."""
+        """(état, détail) : « erreur », « pilotée » (écrite par le cockpit), « lue » (par le
+        cockpit, carte à laquelle rien n'est écrit) ou « connectée »."""
         if self.problem:
             return "erreur", self.problem
         if self._drivers and "cockpit" in self._drivers:
-            return "pilotée", "pilotée par le cockpit"
+            if self.card.type.send_init:
+                return "pilotée", "pilotée par le cockpit"
+            return "lue", "lue par le cockpit"
         return "connectée", "connectée"
 
     def _set_problem(self, text):
@@ -599,9 +603,16 @@ class CardView(QWidget):
             return
         self._drivers = drivers
         self.health_changed.emit()
-        if "cockpit" in drivers:
+        if "cockpit" in drivers and self.card.type.send_init:
             self.banner.setText("Carte pilotée par le cockpit (page Simulateur) : ce que vous"
                                 " écrivez ici sera remplacé par ses propres sorties.")
+            self.banner.setStyleSheet(f"background:{BANNER}; color:#111; padding:6px;"
+                                      " font-weight:bold;")
+            self.banner.show()
+        elif "cockpit" in drivers:            # rien n'est écrit à cette carte : simple rappel
+            self.banner.setText("Carte lue par le cockpit (page Simulateur) : il voit les"
+                                " mêmes boutons et axes qu'ici.")
+            self.banner.setStyleSheet(f"background:{READ_BANNER}; color:#111; padding:6px;")
             self.banner.show()
         else:
             self.banner.hide()

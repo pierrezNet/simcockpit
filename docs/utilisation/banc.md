@@ -11,7 +11,8 @@ La page Cartes, le banc de test, montre les cartes **telles qu'elles sont**, san
 À gauche, une ligne par carte détectée, avec son port USB et une pastille :
 
 - **verte** : connectée ;
-- **bleue** : pilotée par le cockpit (page Simulateur) ;
+- **bleue** : pilotée par le cockpit (page Simulateur), qui écrit à ses sorties ou afficheurs ;
+- **bleu clair** : lue par le cockpit, pour une carte à laquelle rien n'est jamais écrit (manettes des gaz) ;
 - **rouge** : en erreur (accès refusé, carte perdue, bus FDBUS qui ne répond pas). Le détail s'affiche au survol.
 
 La carte choisie s'affiche à droite. La liste défile quel que soit le nombre de cartes, et la carte choisie est retenue d'un lancement à l'autre. Avec « Suivre la carte actionnée », la carte dont on vient d'actionner une commande est choisie toute seule.
@@ -36,7 +37,7 @@ Selon la carte, la vue propose en plus :
 | Manettes Thrustmaster | tous les boutons et interrupteurs (dans leur position dès l'ouverture), les axes de 0 à 1 |
 
 !!! note "Carte pilotée par le cockpit"
-    Le banc et le cockpit partagent la même carte. Quand le cockpit la pilote, un bandeau jaune le rappelle : ce que vous écrivez au banc est remplacé par les sorties du cockpit. Les entrées, elles, s'affichent normalement.
+    Le banc et le cockpit partagent la même carte. Quand le cockpit la pilote, un bandeau jaune le rappelle : ce que vous écrivez au banc est remplacé par les sorties du cockpit. Les entrées, elles, s'affichent normalement. Une carte que le cockpit ne fait que lire porte un bandeau bleu clair.
 
 ## Les jauges du bus FDBUS
 
