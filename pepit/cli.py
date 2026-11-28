@@ -1,4 +1,4 @@
-"""Ligne de commande : python -m simcockpit <commande>."""
+"""Ligne de commande : python -m pepit <commande>."""
 
 import argparse
 import queue
@@ -14,7 +14,7 @@ def _pick(args):
     d = manager.find(args.port)
     if d is None:
         where = f" sur le port {args.port}" if args.port else ""
-        sys.exit(f"Aucune carte connue{where}. Voir : bin/simcockpit list --all")
+        sys.exit(f"Aucune carte connue{where}. Voir : bin/pepit list --all")
     print(f"Carte : {d.label}  ({d.info.product}, port {d.info.usb_port}, {d.info.path})")
     return d
 
@@ -172,7 +172,7 @@ def cmd_fonctions(args):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="simcockpit", description="Cartes de home cockpit sous Linux")
+    p = argparse.ArgumentParser(prog="pepit", description="Cartes de home cockpit sous Linux")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("list", help="détecter et classer les cartes")

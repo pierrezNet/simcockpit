@@ -1,4 +1,4 @@
-# simcockpit
+# Pepit
 
 Pilotage libre, sous **Linux**, de cartes d'interface pour cockpit de simulateur de vol
 (**OpenCockpits**, **EFDE**), écrit en Python. Une alternative à SIOC, le logiciel
@@ -39,7 +39,7 @@ Testé avec Python 3.14.
 
 ```sh
 sudo apt install python3-venv
-git clone https://github.com/pierrezNet/simcockpit.git && cd simcockpit
+git clone https://github.com/pierrezNet/pepit.git && cd pepit
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
@@ -55,7 +55,7 @@ Pour accéder aux cartes sans `sudo`, installez la règle udev, puis débranchez
 rebranchez les cartes. L'utilisateur doit être dans le groupe `plugdev`.
 
 ```sh
-sudo cp udev/99-simcockpit.rules /etc/udev/rules.d/
+sudo cp udev/99-pepit.rules /etc/udev/rules.d/
 sudo udevadm control --reload && sudo udevadm trigger
 ```
 
@@ -64,7 +64,7 @@ sudo udevadm control --reload && sudo udevadm trigger
 ### Fenêtre de test des cartes
 
 ```sh
-bin/simcockpit-gui
+bin/pepit-banc
 ```
 
 Le banc de test ne connaît ni la logique ni X-Plane : il montre les cartes telles
@@ -93,16 +93,16 @@ l'onglet montre une colonne par jauge trouvée :
   apparaît en rouge ;
 - le **nom et l'unité** de la jauge branchée sur la sortie (rien n'est figé dans le code) ;
 - les paramètres du module, sa remise à zéro et le **changement d'adresse** (strap de
-  configuration en place ; c'est la seule écriture en EEPROM que fait simcockpit).
+  configuration en place ; c'est la seule écriture en EEPROM que fait Pepit).
 
 Nom, unité et étalonnage sont gardés dans `config/fdbus.yaml`, jamais dans les modules.
 
 ### Panneau virtuel (logique du cockpit)
 
 ```sh
-bin/cockpit-panel                                # Avro RJ85, logique simulée
-bin/cockpit-panel config/avions/b738-laminar     # Boeing 737-800 de Laminar (X-Plane)
-bin/cockpit-panel config/avions/bae146-jf        # BAe 146 de Just Flight (X-Plane) : MCP, CDU, jauges, transpondeur
+bin/pepit-cockpit                                # Avro RJ85, logique simulée
+bin/pepit-cockpit config/avions/b738-laminar     # Boeing 737-800 de Laminar (X-Plane)
+bin/pepit-cockpit config/avions/bae146-jf        # BAe 146 de Just Flight (X-Plane) : MCP, CDU, jauges, transpondeur
 ```
 
 Le panneau connecte les cartes déclarées dans la configuration, applique la logique de
@@ -112,7 +112,7 @@ les boutons qui remplacent le matériel sont rangés dans « Commandes virtuelle
 configuration ».
 
 > Les afficheurs du MCP ne restent allumés **que tant qu'un programme lit la carte**.
-> Gardez donc `bin/cockpit-panel` ou `bin/simcockpit-gui` ouvert.
+> Gardez donc `bin/pepit-cockpit` ou `bin/pepit-banc` ouvert.
 
 **Écran du CDU :** dans l'onglet du CDU, « Écran physique du CDU » choisit la sortie vidéo
 de l'écran placé derrière la façade (`xrandr --listmonitors`). Le panneau y ouvre une
@@ -126,8 +126,8 @@ le réglage est gardé dans `config/ecrans.yaml`.
 ### Mode développement
 
 ```sh
-bin/simcockpit-gui --dev
-bin/cockpit-panel --dev [config/avions/…]
+bin/pepit-banc --dev
+bin/pepit-cockpit --dev [config/avions/…]
 ```
 
 La fenêtre se relance d'elle-même dès qu'un fichier Python du projet est enregistré (et,
@@ -137,20 +137,20 @@ suivante. Fermer la fenêtre arrête tout.
 ### Ligne de commande
 
 ```sh
-bin/simcockpit list [--all]               # détecter et classer les cartes
-bin/simcockpit watch [--axes]             # changements d'entrées (anti-rebond 50 ms)
-bin/simcockpit diag -s 10                 # repérer les entrées instables
-bin/simcockpit check                      # assistant : tester les entrées borne par borne
-bin/simcockpit outputs                    # assistant : tester les sorties une par une
-bin/simcockpit listen --port 1-14         # trames brutes, sans rien envoyer
-bin/simcockpit send --port 1-14 "…"       # envoyer une trame brute (essais)
-bin/simcockpit fonctions [dossier d'avion] [--filtre hdg]   # dictionnaire des fonctions
+bin/pepit list [--all]               # détecter et classer les cartes
+bin/pepit watch [--axes]             # changements d'entrées (anti-rebond 50 ms)
+bin/pepit diag -s 10                 # repérer les entrées instables
+bin/pepit check                      # assistant : tester les entrées borne par borne
+bin/pepit outputs                    # assistant : tester les sorties une par une
+bin/pepit listen --port 1-14         # trames brutes, sans rien envoyer
+bin/pepit send --port 1-14 "…"       # envoyer une trame brute (essais)
+bin/pepit fonctions [dossier d'avion] [--filtre hdg]   # dictionnaire des fonctions
 ```
 
 ### Avec X-Plane 12
 
 ```sh
-bin/cockpit-panel config/avions/b738-laminar     # MCP, radio et CDU reliés au Boeing 737-800 de Laminar
+bin/pepit-cockpit config/avions/b738-laminar     # MCP, radio et CDU reliés au Boeing 737-800 de Laminar
 ```
 
 Lancez X-Plane (le port UDP 49000 est ouvert par défaut) et chargez l'avion. Les écrans texte publiés par un plugin
@@ -251,10 +251,10 @@ chargement, avec les noms proches. Champs d'une entrée : `dataref`, `valeurs`, 
 documentation, `description`, `unite`, `verifie`. Pour consulter le dictionnaire :
 
 ```sh
-bin/simcockpit fonctions config/avions/bae146-jf --filtre pa.mode
+bin/pepit fonctions config/avions/bae146-jf --filtre pa.mode
 ```
 
-Les numéros d'entrées sont ceux affichés par `simcockpit-gui`. Exemple d'instrument :
+Les numéros d'entrées sont ceux affichés par `pepit-banc`. Exemple d'instrument :
 
 ```yaml
 instruments:
@@ -410,7 +410,7 @@ haute).
 |---|---|
 | 0 | CRS1 = n2 n1 n0 · IAS = n5 n4 n3 · HDG = n8 n7 n6 · ALT (2 premiers chiffres) = n10 n9 · n11 bit 3 = point décimal d'IAS |
 | 1 | ALT (3 derniers chiffres) = n2 n1 n0 · CRS2 = n5 n4 n3 · V/S = n10 … n6 |
-| 2 | voyants : 16 bits dans les octets 0 et 1 (voir `simcockpit/hw/mcp.py`) |
+| 2 | voyants : 16 bits dans les octets 0 et 1 (voir `pepit/hw/mcp.py`) |
 
 Codes des chiffres : 0 à 9 ; `a` = chiffre éteint ; `b` = signe moins.
 
@@ -438,7 +438,7 @@ MCP. En écriture, deux sortes de trames, selon le bit 7 de l'octet 6 :
 - **afficheurs** (bit 7 à 0) : 12 demi-octets dans les octets 0 à 5, ACTIVE = n5 … n0 et
   STANDBY = n11 … n6 (codes du MCP) ; les bits 0 à 5 de l'octet 6 allument les points
   décimaux (`02` : ACTIVE « 888.888 », `08` : STANDBY « 888.888 », voir
-  `simcockpit/hw/radio_airbus.py`) ;
+  `pepit/hw/radio_airbus.py`) ;
 - **voyants** (octet 6 = `80`) : un bit par voyant dans l'octet 0 (VHF1, VHF2, SEL, VOR,
   ADF, BFO, NAV, ILS).
 
@@ -446,9 +446,9 @@ MCP. En écriture, deux sortes de trames, selon le bit 7 de l'octet 6 :
 tant qu'on ne lui a rien écrit. Ensuite, chaque appui envoie une trame dont l'octet 0 est
 le numéro de la touche (1 à 88) ; rien n'est envoyé au relâchement. En écriture, l'octet 0
 est un masque des voyants : bit 0 OFST, 1 MSG, 2 EXEC, 3 DSPY, 4 FAIL. La table des touches
-est dans `simcockpit/hw/usbfmc.py`.
+est dans `pepit/hw/usbfmc.py`.
 
-Le détail et les cas vérifiés se trouvent dans `simcockpit/hw/` et dans les tests, qui
+Le détail et les cas vérifiés se trouvent dans `pepit/hw/` et dans les tests, qui
 rejouent des captures réelles (`tests/data/`).
 
 **Bus de jauges EFDE (FDBUS)** (structure communiquée par EFDE, séquence vérifiée à la
@@ -462,9 +462,9 @@ Aucune commande de position n'est prise en compte sans l'initialisation complèt
 3. `fe 00 00` : la carte répond `fe`, l'initialisation est terminée.
 
 Ensuite, `03 adr pos` place l'aiguille de la sortie 1 (0 à 255, borné par Mini et Maxi du
-module) ; la première après l'initialisation est ignorée, simcockpit l'envoie deux fois.
+module) ; la première après l'initialisation est ignorée, Pepit l'envoie deux fois.
 `07 adr 00` ramène le moteur X27 en butée. Les fonctions 50 à 88 écrivent l'EEPROM du
-module : simcockpit n'envoie que la 50 (changement d'adresse, `32 adr nouvelle`), sur
+module : Pepit n'envoie que la 50 (changement d'adresse, `32 adr nouvelle`), sur
 demande. Deux modules à la même adresse se répondent l'un sur l'autre : renuméroter l'un
 d'eux, puis couper l'alimentation du bus. Sans le 5 V du bus, le module X27 s'annonce en
 type 0.
@@ -479,14 +479,14 @@ type 0.
 
 ```
 arduino/            programmes des cartes Arduino / ESP8266 (identifiants wifi dans secrets.h, non publié)
-bin/                lanceurs : simcockpit-gui, cockpit-panel, simcockpit (ligne de commande)
+bin/                lanceurs : pepit-banc, pepit-cockpit, Pepit (ligne de commande)
 config/             configuration : matériel et un dossier par avion
-simcockpit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc, radio_airbus, fdbus, evdev, serveur IOCP)
-simcockpit/diag/    bruit, assistants de test des entrées et des sorties
-simcockpit/logic/   configuration, dictionnaire des fonctions, types de commandes (dont les jauges), moteur, atmosphère standard
-simcockpit/gui/     fenêtre de test des cartes
-simcockpit/panel/   panneau virtuel (logique du cockpit)
-simcockpit/sim/     liaison X-Plane (UDP ; API web locale pour les datarefs texte des plugins)
+pepit/hw/      accès hidraw, registre des cartes, protocoles (mastercard, bitmap, mcp, dme, usbfmc, radio_airbus, fdbus, evdev, serveur IOCP)
+pepit/diag/    bruit, assistants de test des entrées et des sorties
+pepit/logic/   configuration, dictionnaire des fonctions, types de commandes (dont les jauges), moteur, atmosphère standard
+pepit/gui/     fenêtre de test des cartes
+pepit/panel/   panneau virtuel (logique du cockpit)
+pepit/sim/     liaison X-Plane (UDP ; API web locale pour les datarefs texte des plugins)
 tests/              tests unitaires et captures réelles
 udev/               règle d'accès aux cartes
 iocard_test.py      script d'exploration d'origine (référence)
@@ -496,12 +496,12 @@ iocard_test.py      script d'exploration d'origine (référence)
 
 Le format des entrées Master Card et le codage des sorties ont été établis en lisant le
 code de [xpiocards](https://sourceforge.net/projects/xpiocards/) et de
-[xpcockpit](https://github.com/retostockli/xpcockpit) (Reto Stöckli). simcockpit est une
+[xpcockpit](https://github.com/retostockli/xpcockpit) (Reto Stöckli). Pepit est une
 réécriture indépendante : aucun code de ces projets n'a été copié. Le protocole de
 sortie du MCP a été retrouvé par essais, en vérifiant chaque résultat à la webcam.
 
 ## Licence
 
-simcockpit est un logiciel libre, distribué sous la **GNU General Public License,
+Pepit est un logiciel libre, distribué sous la **GNU General Public License,
 version 3 ou toute version ultérieure** (GPL-3.0-or-later), comme xpcockpit, dont il
 s'inspire. Voir le fichier [LICENSE](LICENSE).

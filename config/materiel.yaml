@@ -1,7 +1,7 @@
 # Cartes physiques du cockpit, décrites une seule fois pour tous les avions.
 # Une carte est désignée par son nom USB. Ajoutez `usb_port` (affiché par
-# `python3 -m simcockpit list`) si plusieurs cartes identiques sont branchées.
-# Les numéros d'entrées sont ceux affichés par bin/simcockpit-gui.
+# `python3 -m pepit list`) si plusieurs cartes identiques sont branchées.
+# Les numéros d'entrées sont ceux affichés par bin/pepit-banc.
 
 cards:
   io32:
@@ -20,7 +20,7 @@ cards:
     product: TCA Q-Eng 1&2    # Thrustmaster TCA Q-Eng 1&2 (manettes des gaz, lu par evdev)
   arduino_carburant:
     product: IOCP             # afficheur carburant ESP8266 en wifi : il se connecte à
-    port: 8092                # simcockpit comme à SIOC (protocole IOCP, port 8092)
+    port: 8092                # Pepit comme à SIOC (protocole IOCP, port 8092)
   ecran_vitesses:
     product: IOCP             # écran à encre LilyGo T5 4,7" en wifi (carte des vitesses),
     port: 8092                # même serveur IOCP que l'afficheur carburant

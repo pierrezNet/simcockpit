@@ -2,9 +2,9 @@
 
 import unittest
 
-from simcockpit.hw import radio_airbus
-from simcockpit.logic import config
-from simcockpit.logic.engine import Engine
+from pepit.hw import radio_airbus
+from pepit.logic import config
+from pepit.logic.engine import Engine
 
 COM1_ACT = "sim/cockpit2/radios/actuators/com1_frequency_hz_833"
 COM1_STBY = "sim/cockpit2/radios/actuators/com1_standby_frequency_hz_833"

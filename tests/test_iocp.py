@@ -4,9 +4,9 @@ import socket
 import time
 import unittest
 
-from simcockpit.hw import iocp
-from simcockpit.logic import config
-from simcockpit.logic.engine import Engine
+from pepit.hw import iocp
+from pepit.logic import config
+from pepit.logic.engine import Engine
 
 
 class TestMessages(unittest.TestCase):
@@ -86,7 +86,7 @@ class TestLivret(unittest.TestCase):
     """Carte des vitesses du BAe 146 : une page par masse, page de la masse supérieure."""
 
     def lookup(self, **kw):
-        from simcockpit.logic.iocp_lookup import IocpLookup
+        from pepit.logic.iocp_lookup import IocpLookup
         return IocpLookup("livret", source="sim/m", variables={"page": 210, "vr": 211, "v2": 212},
                           pages={36000: {"vr": 120, "v2": 128}, 38000: {"vr": 125}}, **kw)
 
@@ -117,7 +117,7 @@ class TestLivret(unittest.TestCase):
 
 class TestPortPartage(unittest.TestCase):
     def test_deux_cartes_un_serveur(self):
-        from simcockpit.logic.config import CardSpec
+        from pepit.logic.config import CardSpec
         eng = Engine(config.load("config/avions/bae146-jf"))
         spec = CardSpec("x", "IOCP", None, 0)            # port 0 : libre, choisi par le système
         try:

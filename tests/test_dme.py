@@ -2,7 +2,7 @@
 
 import unittest
 
-from simcockpit.hw import cards, dme
+from pepit.hw import cards, dme
 
 
 class TestDmeFrames(unittest.TestCase):

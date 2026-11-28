@@ -3,10 +3,10 @@
 import os
 import unittest
 
-from simcockpit.hw import mcp
-from simcockpit.hw.bitmap import BitmapDecoder
-from simcockpit.logic import config, controls
-from simcockpit.logic.engine import Engine
+from pepit.hw import mcp
+from pepit.hw.bitmap import BitmapDecoder
+from pepit.logic import config, controls
+from pepit.logic.engine import Engine
 from tests.test_mastercard import frames
 
 ROOT = os.path.dirname(os.path.dirname(__file__))

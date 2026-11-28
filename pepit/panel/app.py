@@ -1,6 +1,6 @@
 """Application « panneau virtuel » : lit la configuration, connecte les cartes, affiche les instruments.
 
-Lancement : .venv/bin/python -m simcockpit.panel [config/avions/rj85-simule | dossier d'avion | fichier .yaml]
+Lancement : .venv/bin/python -m pepit.panel [config/avions/rj85-simule | dossier d'avion | fichier .yaml]
 """
 
 import sys
@@ -633,7 +633,7 @@ class PanelWindow(QMainWindow):
         self.path = path
         self.engine = None
         self.widgets = {}
-        self.setWindowTitle(f"simcockpit — panneau virtuel ({path})")
+        self.setWindowTitle(f"Pepit — panneau virtuel ({path})")
         remember(self, "cockpit_virtuel", (1200, 700))   # position et taille mémorisées
 
         central = QWidget()

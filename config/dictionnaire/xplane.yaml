@@ -7,7 +7,7 @@
 # Champs de branchement : dataref, valeurs (libellé → nombre), commande, commande_on,
 # commande_off, bascule, etat, etat_on, echelle. Documentation : description, unite,
 # verifie (date et avion où le branchement a été vérifié ; absent = pas encore vérifié).
-# Liste lisible : python -m simcockpit fonctions [dossier d'avion]
+# Liste lisible : python -m pepit fonctions [dossier d'avion]
 
 fonctions:
   # --- Transpondeur

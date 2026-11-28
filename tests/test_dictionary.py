@@ -2,8 +2,8 @@
 
 import unittest
 
-from simcockpit.logic import config
-from simcockpit.logic.dictionary import Dictionary, DictionaryError, load_base
+from pepit.logic import config
+from pepit.logic.dictionary import Dictionary, DictionaryError, load_base
 
 BASE = {
     "transpondeur.mode": {"dataref": "sim/x/transponder_mode",

@@ -1,10 +1,10 @@
 // Afficheur carburant du BAe 146 : ESP8266 + écran OLED SSD1306 128x64, en wifi.
 // Adapté du programme écrit pour le MD-80 sous SIOC (version 1.0.0).
 //
-// La carte se connecte au PC qui fait tourner simcockpit (serveur IOCP, port 8092),
+// La carte se connecte au PC qui fait tourner Pepit (serveur IOCP, port 8092),
 // comme elle le faisait avec SIOC, et demande trois variables :
 //   201 = aile gauche (LFT), 202 = aile droite (RGT), 203 = réservoir central (CTR)
-// simcockpit les envoie directement en kg (config/avions/bae146-jf/carburant.yaml) :
+// Pepit les envoie directement en kg (config/avions/bae146-jf/carburant.yaml) :
 // plus de conversion à faire ici. Le total est calculé par la carte.
 //
 // Carte : « Generic ESP8266 Module ». Mise à jour possible en wifi (OTA, nom esp8266fuel).
@@ -20,7 +20,7 @@
 #include <ArduinoOTA.h>
 #include "secrets.h"            // WIFI_SSID, WIFI_PASSWORD (jamais publié)
 
-// -------------------- VERSION 2.0.0 (BAe 146, simcockpit) ----------------------
+// -------------------- VERSION 2.0.0 (BAe 146, Pepit) ----------------------
 
 // Réseau ************************************************************************/
 const char* host = "esp8266fuel";
@@ -33,7 +33,7 @@ IPAddress subnet(255, 255, 255, 0);
 IPAddress myDns1(1, 1, 1, 1);
 IPAddress myDns2(8, 8, 8, 8);
 
-// PC qui fait tourner simcockpit (relevé le 2026-11-25 : 192.168.1.20)
+// PC qui fait tourner Pepit (relevé le 2026-11-25 : 192.168.1.20)
 IPAddress serveriocp(192, 168, 1, 20);
 const uint16_t portiocp = 8092;
 
@@ -66,7 +66,7 @@ void message(const __FlashStringHelper* l1, const __FlashStringHelper* l2) {
   display.display();
 }
 
-// Connexion au serveur IOCP (simcockpit) et annonce des variables voulues
+// Connexion au serveur IOCP (Pepit) et annonce des variables voulues
 void connecterIOCP() {
   message(F("Waiting IOCP"), F("server connection"));
   while (!client.connect(serveriocp, portiocp)) {

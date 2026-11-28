@@ -84,7 +84,7 @@ class CduDisplayWindow(QWidget):
 
     def __init__(self, ctrl, owner):
         super().__init__(owner, Qt.Window | Qt.FramelessWindowHint)
-        self.setWindowTitle("simcockpit — écran du CDU")
+        self.setWindowTitle("Pepit — écran du CDU")
         self.setCursor(Qt.BlankCursor)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)

@@ -6,9 +6,9 @@ Nécessite PyYAML : .venv/bin/python -m unittest discover -s tests -t .
 import os
 import unittest
 
-from simcockpit.hw.mastercard import Decoder
-from simcockpit.logic import config, controls
-from simcockpit.logic.engine import Engine
+from pepit.hw.mastercard import Decoder
+from pepit.logic import config, controls
+from pepit.logic.engine import Engine
 from tests.test_mastercard import frames
 
 ROOT = os.path.dirname(os.path.dirname(__file__))

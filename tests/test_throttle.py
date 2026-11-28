@@ -3,10 +3,10 @@
 import struct
 import unittest
 
-from simcockpit.hw import evdev
-from simcockpit.logic import config
-from simcockpit.logic.engine import Engine
-from simcockpit.logic.throttle import ThrottleAxis
+from pepit.hw import evdev
+from pepit.logic import config
+from pepit.logic.engine import Engine
+from pepit.logic.throttle import ThrottleAxis
 
 T0, T1 = (f"sim/cockpit2/engine/actuators/throttle_ratio[{i}]" for i in range(2))
 H0, H1, H2, H3 = (f"thranda/cockpit/Throttle[{i}]" for i in range(4))     # manettes du 146

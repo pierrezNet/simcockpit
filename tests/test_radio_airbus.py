@@ -2,7 +2,7 @@
 
 import unittest
 
-from simcockpit.hw import cards, radio_airbus as r
+from pepit.hw import cards, radio_airbus as r
 
 
 class TestRadioAirbus(unittest.TestCase):

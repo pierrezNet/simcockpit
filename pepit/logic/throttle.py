@@ -13,7 +13,7 @@ Coupure carburant (BAe 146 : position OFF derrière le ralenti, pas d'inverseur)
 d'HYSTERESIS vers le cran : une vibration près du seuil ne coupe pas le moteur.
 
 Les axes de la manette doivent être désaffectés dans les réglages joystick d'X-Plane :
-sinon X-Plane et simcockpit écrivent tous deux la poussée.
+sinon X-Plane et Pepit écrivent tous deux la poussée.
 """
 
 from .controls import Control

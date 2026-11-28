@@ -6,7 +6,7 @@
 # coupé). Le cran du TQ sert de ralenti ; bien derrière (au-delà de 0,80), la manette
 # passe sur OFF ; on démarre l'injection en ramenant la manette de OFF au cran.
 # À faire dans X-Plane : désaffecter les deux axes du TQ (Réglages → Joystick), sinon
-# X-Plane et simcockpit écrivent tous deux la poussée.
+# X-Plane et Pepit écrivent tous deux la poussée.
 
 instruments:
   manettes:

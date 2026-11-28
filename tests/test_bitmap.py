@@ -2,9 +2,9 @@
 
 import unittest
 
-from simcockpit.hw.bitmap import BitmapDecoder
-from simcockpit.hw.cards import OC_MCP, classify
-from simcockpit.hw.debounce import Debouncer
+from pepit.hw.bitmap import BitmapDecoder
+from pepit.hw.cards import OC_MCP, classify
+from pepit.hw.debounce import Debouncer
 from tests.test_mastercard import frames
 
 

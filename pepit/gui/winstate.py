@@ -1,10 +1,18 @@
-"""Mémoire de la position et de la taille des fenêtres (QSettings, ~/.config/simcockpit/).
+"""Mémoire de la position et de la taille des fenêtres (QSettings, ~/.config/pepit/).
 
 Enregistrée à chaque déplacement ou redimensionnement (après une courte pause), et pas
 seulement à la fermeture : le mode --dev relance la fenêtre sans la fermer proprement.
 """
 
+import shutil
+from pathlib import Path
+
 from PySide6.QtCore import QEvent, QObject, QSettings, QTimer
+
+# Avant le changement de nom (2026-11-28), les réglages étaient dans ~/.config/simcockpit/ :
+# ils sont repris une fois, pour garder les positions et les écrans des fenêtres.
+_OLD = Path.home() / ".config" / "simcockpit" / "fenetres.conf"
+_NEW = Path.home() / ".config" / "pepit" / "fenetres.conf"
 
 
 class _Saver(QObject):
@@ -25,7 +33,10 @@ class _Saver(QObject):
 
 
 def settings():
-    return QSettings("simcockpit", "fenetres")
+    if not _NEW.exists() and _OLD.exists():
+        _NEW.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(_OLD, _NEW)
+    return QSettings("pepit", "fenetres")
 
 
 def remember(window, key, default_size):

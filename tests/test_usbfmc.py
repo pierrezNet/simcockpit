@@ -2,7 +2,7 @@
 
 import unittest
 
-from simcockpit.hw import cards, usbfmc
+from pepit.hw import cards, usbfmc
 
 
 class TestUsbFmc(unittest.TestCase):

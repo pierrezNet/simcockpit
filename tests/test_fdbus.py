@@ -2,7 +2,7 @@
 
 import unittest
 
-from simcockpit.hw import cards, fdbus
+from pepit.hw import cards, fdbus
 
 
 def pkt(*data):

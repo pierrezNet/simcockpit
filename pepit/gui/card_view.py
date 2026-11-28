@@ -522,7 +522,7 @@ class CardView(QWidget):
         except PermissionError:
             self.status.setText(
                 f"Accès refusé à {self.detected.info.path} : installez la règle udev"
-                " (voir udev/99-simcockpit.rules) puis débranchez/rebranchez la carte.")
+                " (voir udev/99-pepit.rules) puis débranchez/rebranchez la carte.")
             self.status.setStyleSheet("color:#e55; font-weight:bold;")
             if not self.detected.known:
                 self.last.setText("Accès refusé (règle udev manquante)")

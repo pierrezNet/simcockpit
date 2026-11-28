@@ -43,7 +43,7 @@ def _stop(child):
             child.wait()
 
 
-def run(module, args, watch=("simcockpit/**/*.py",)):
+def run(module, args, watch=("pepit/**/*.py",)):
     """Lance `python -m module args` et le relance à chaque modification des fichiers `watch`."""
     cmd = [sys.executable, "-m", module, *args]
     # arrêté par un signal (kill, fermeture du terminal) : on arrête aussi la fenêtre

@@ -2,8 +2,8 @@
 
 import unittest
 
-from simcockpit.hw import dme
-from simcockpit.logic.dme_indicator import DmeIndicator
+from pepit.hw import dme
+from pepit.logic.dme_indicator import DmeIndicator
 
 SEL, PWR = 0, 1
 

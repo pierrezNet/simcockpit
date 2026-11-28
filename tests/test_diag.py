@@ -2,9 +2,9 @@
 
 import unittest
 
-from simcockpit.diag.input_check import TerminalProbe, TerminalResult, summarize
-from simcockpit.diag.output_check import segments_for
-from simcockpit.hw.mastercard import output_location, output_report
+from pepit.diag.input_check import TerminalProbe, TerminalResult, summarize
+from pepit.diag.output_check import segments_for
+from pepit.hw.mastercard import output_location, output_report
 
 REST = [0] * 72
 
@@ -76,7 +76,7 @@ class TestOutputs(unittest.TestCase):
 
 class TestDisplays(unittest.TestCase):
     def test_pairs_value_position(self):
-        from simcockpit.hw.mastercard import BLANK, display_reports
+        from pepit.hw.mastercard import BLANK, display_reports
         reps = display_reports({0: 0, 1: 1, 2: 2, 3: 3, 4: 4})
         self.assertEqual([r.hex(" ") for r in reps],
                          ["00 00 01 01 02 02 03 03", "04 04 ff ff ff ff ff ff"])

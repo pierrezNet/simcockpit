@@ -5,10 +5,10 @@ import struct
 import time
 import unittest
 
-from simcockpit.hw import mcp
-from simcockpit.logic import config
-from simcockpit.logic.engine import Engine
-from simcockpit.sim import xplane
+from pepit.hw import mcp
+from pepit.logic import config
+from pepit.logic.engine import Engine
+from pepit.sim import xplane
 
 
 class FakeXPlane:
@@ -122,8 +122,8 @@ class TestEngineWithSim(unittest.TestCase):
         self.assertNotIn(("cmd", "laminar/B738/autopilot/disconnect_toggle"), actions)
 
     def test_display_options(self):
-        from simcockpit.hw import mcp
-        from simcockpit.logic.controls import Encoder
+        from pepit.hw import mcp
+        from pepit.logic.controls import Encoder
         alt = Encoder("alt", [2, 3], min=0, max=41000, step=100, display="ALT", min_digits=3)
         vs = Encoder("vs", [10, 11], min=-7900, max=6000, step=100, display="VS",
                      blank_unless="laminar/B738/autopilot/vs_status")
@@ -145,7 +145,7 @@ class TestEngineWithSim(unittest.TestCase):
         self.assertEqual(digits, [B, B, 0, 0, 0])
 
     def test_blank_when(self):
-        from simcockpit.logic.controls import Encoder
+        from pepit.logic.controls import Encoder
         e = Encoder("vs", [10, 11], min=-1000, max=1000, step=100, display="VS", blank_when=0)
         self.assertEqual(e.shown(0), (None, False))
         self.assertEqual(e.shown(100), (100, False))

@@ -2,7 +2,7 @@
 
 import unittest
 
-from simcockpit.hw import mcp
+from pepit.hw import mcp
 
 
 class TestMcpFrames(unittest.TestCase):

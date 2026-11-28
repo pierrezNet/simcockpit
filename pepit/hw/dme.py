@@ -39,7 +39,7 @@ ANNUNCIATORS = {
     "unite_droite": (0x05, 6, {"HLD": 1, "KT": 2, "MIN": 3, "ID": 4}),
 }
 
-# Boutons : octet 0 reçu tant que le bouton est enfoncé → numéro d'entrée simcockpit.
+# Boutons : octet 0 reçu tant que le bouton est enfoncé → numéro d'entrée Pepit.
 BUTTONS = {0x01: 0, 0x02: 1}     # SEL = entrée 0, PWR = entrée 1
 BUTTON_NAMES = {0: "SEL", 1: "PWR"}
 

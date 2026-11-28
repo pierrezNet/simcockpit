@@ -2,10 +2,10 @@
 
 import unittest
 
-from simcockpit.hw import usbfmc
-from simcockpit.logic import config
-from simcockpit.logic.engine import Engine
-from simcockpit.logic.sim_controls import Keypad
+from pepit.hw import usbfmc
+from pepit.logic import config
+from pepit.logic.engine import Engine
+from pepit.logic.sim_controls import Keypad
 
 EXEC_LIGHT = "sim/cockpit2/radios/indicators/fms_exec_light_pilot"
 CODE = {name: code for code, name in usbfmc.KEYS.items()}

@@ -56,7 +56,7 @@ instruments:
         display: CRS2
         leading_zeros: true     # affiche 000, 045…
       pilote_auto:
-        type: rj_autopilot      # logique RJ simulée (voir simcockpit/logic/rj_autopilot.py)
+        type: rj_autopilot      # logique RJ simulée (voir pepit/logic/rj_autopilot.py)
         buttons:                # poussoirs du MCP (1 au repos, 0 appuyé)
           N1: 29                # THRUST
           SPEED: 28             # THRUST aussi

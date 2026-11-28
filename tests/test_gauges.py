@@ -2,9 +2,9 @@
 
 import unittest
 
-from simcockpit.hw import fdbus
-from simcockpit.logic import config
-from simcockpit.logic.engine import Engine
+from pepit.hw import fdbus
+from pepit.logic import config
+from pepit.logic.engine import Engine
 
 CALS = {
     (250, 1): fdbus.Calibration({0: 10, 18: 158, 24: 202, 33: 255}, 49, "Volets", "°"),

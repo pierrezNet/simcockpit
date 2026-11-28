@@ -3,9 +3,9 @@
 import os
 import unittest
 
-from simcockpit.hw.mastercard import Decoder
-from simcockpit.logic import config
-from simcockpit.logic.engine import Engine
+from pepit.hw.mastercard import Decoder
+from pepit.logic import config
+from pepit.logic.engine import Engine
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CODE = "sim/cockpit2/radios/actuators/transponder_code"

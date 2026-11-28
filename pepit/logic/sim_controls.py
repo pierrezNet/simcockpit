@@ -3,7 +3,7 @@
 - `commands` : chaque poussoir déclenche une commande X-Plane à l'appui ;
 - `sim_leds` : chaque voyant (du MCP) suit un dataref (allumé si la valeur est non nulle).
 
-C'est l'avion simulé qui décide de l'état des modes : simcockpit transmet les appuis
+C'est l'avion simulé qui décide de l'état des modes : Pepit transmet les appuis
 et recopie les voyants, comme un vrai MCP relié à ses calculateurs.
 """
 
@@ -87,7 +87,7 @@ class Keypad(Control):
     """Clavier (CDU) : chaque touche, désignée par son nom, déclenche une commande X-Plane.
 
     Les touches arrivent comme des événements « key » (une trame par appui, rien au
-    relâchement) ; les noms sont ceux de simcockpit/hw/usbfmc.py (EXEC, LSK1L, A, 1…).
+    relâchement) ; les noms sont ceux de pepit/hw/usbfmc.py (EXEC, LSK1L, A, 1…).
     """
     type = "keypad"
 

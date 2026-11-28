@@ -2,8 +2,8 @@
 
 import unittest
 
-from simcockpit.logic.cdu_screen import BASE, COLUMNS, CduScreen
-from simcockpit.sim import xplane
+from pepit.logic.cdu_screen import BASE, COLUMNS, CduScreen
+from pepit.sim import xplane
 
 
 def feed(scr, line, text, styles=()):

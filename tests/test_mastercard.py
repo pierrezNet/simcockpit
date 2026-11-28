@@ -6,9 +6,9 @@ Lancer : python3 -m unittest discover -s tests -t .
 import os
 import unittest
 
-from simcockpit.hw.cards import EFDE_IO32, MASTERCARD, UNKNOWN, classify
-from simcockpit.hw.debounce import Debouncer, GroupDebouncer
-from simcockpit.hw.mastercard import Decoder, init_packet
+from pepit.hw.cards import EFDE_IO32, MASTERCARD, UNKNOWN, classify
+from pepit.hw.debounce import Debouncer, GroupDebouncer
+from pepit.hw.mastercard import Decoder, init_packet
 
 DATA = os.path.join(os.path.dirname(__file__), "data")
 

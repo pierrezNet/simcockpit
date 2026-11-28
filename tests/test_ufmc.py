@@ -3,10 +3,10 @@
 import base64
 import unittest
 
-from simcockpit.logic import config
-from simcockpit.logic.engine import Engine
-from simcockpit.logic.ufmc_screen import COLUMNS, LARGE, decode_line
-from simcockpit.sim import xplane_web
+from pepit.logic import config
+from pepit.logic.engine import Engine
+from pepit.logic.ufmc_screen import COLUMNS, LARGE, decode_line
+from pepit.sim import xplane_web
 
 
 def sizes(styles):

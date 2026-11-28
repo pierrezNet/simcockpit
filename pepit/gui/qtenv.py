@@ -46,5 +46,5 @@ def prepare():
         if not missing:
             os.environ["QT_QPA_PLATFORM"] = "xcb"          # XWayland : position mémorisable
         else:
-            print("simcockpit : sous Wayland, seule la taille des fenêtres est mémorisée ;"
+            print("Pepit : sous Wayland, seule la taille des fenêtres est mémorisée ;"
                   f" pour la position aussi : sudo apt install {' '.join(missing)}", flush=True)

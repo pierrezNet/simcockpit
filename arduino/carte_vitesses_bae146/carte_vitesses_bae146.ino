@@ -1,8 +1,8 @@
 // Carte des vitesses du BAe 146 sur écran à encre LilyGo T5 4,7" (ESP32 + PSRAM, 960 x 540),
 // présentée à la verticale. Remplace le programme « Alert Messages » écrit pour SIOC.
 //
-// La carte se connecte au PC qui fait tourner simcockpit (serveur IOCP, port 8092) et
-// demande les variables 210 à 223. simcockpit choisit la page du livret selon la masse de
+// La carte se connecte au PC qui fait tourner Pepit (serveur IOCP, port 8092) et
+// demande les variables 210 à 223. Pepit choisit la page du livret selon la masse de
 // l'avion (config/avions/bae146-jf/carte_vitesses.yaml) : les valeurs du livret sont donc
 // sur le PC, pas ici. L'écran se contente de dessiner la page reçue, et ne se rafraîchit
 // que lorsqu'une valeur change (une encre électronique clignote et s'use à chaque
@@ -24,7 +24,7 @@
 #include "roboto12.h"     // petits libellés
 #include "secrets.h"      // WIFI_SSID, WIFI_PASSWORD (jamais publié)
 
-// -------------------- VERSION 2.2.0 (BAe 146, simcockpit) ----------------------
+// -------------------- VERSION 2.2.0 (BAe 146, Pepit) ----------------------
 
 // Réseau ************************************************************************/
 const char* host = "esp32carte";
@@ -35,7 +35,7 @@ IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress myDns1(1, 1, 1, 1);
 IPAddress myDns2(8, 8, 8, 8);
-IPAddress serveriocp(192, 168, 1, 20);    // PC qui fait tourner simcockpit
+IPAddress serveriocp(192, 168, 1, 20);    // PC qui fait tourner Pepit
 const uint16_t portiocp = 8092;
 WiFiClient client;
 

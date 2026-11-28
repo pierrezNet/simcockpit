@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from simcockpit.hw import screens
+from pepit.hw import screens
 
 
 class TestScreens(unittest.TestCase):

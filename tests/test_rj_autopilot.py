@@ -2,9 +2,9 @@
 
 import unittest
 
-from simcockpit.logic import config
-from simcockpit.logic.engine import Engine
-from simcockpit.logic.rj_autopilot import RjAutopilot
+from pepit.logic import config
+from pepit.logic.engine import Engine
+from pepit.logic.rj_autopilot import RjAutopilot
 
 BUTTONS = {"N1": 29, "SPEED": 28, "VNAV": 27, "LVL CHG": 26, "HDG SEL": 25, "LNAV": 24,
            "VOR LOC": 23, "APP": 22, "ALT HLD": 21, "V/S": 20, "CMD A": 19, "CMD B": 18,

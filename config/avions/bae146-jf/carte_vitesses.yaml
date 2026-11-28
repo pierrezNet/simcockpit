@@ -2,7 +2,7 @@
 # Livret « BAe 146 Series 300, Non-Limiting Speed charts, 27000-46000 kg », tiré du
 # manuel de vol du 146-300, températures moyennes, vitesses en kt IAS ; atterrissage
 # normal volets 33° et 24°, anormal 30°, 18° et 0°.
-# Le livret a une page par masse, aux valeurs fixes ; simcockpit prend la page de la masse
+# Le livret a une page par masse, aux valeurs fixes ; Pepit prend la page de la masse
 # immédiatement supérieure à celle de l'avion et l'envoie à l'écran (variables 210 à 223).
 # Une case absente d'une page vaut 0 : l'écran affiche un tiret.
 # Programme de l'écran : arduino/carte_vitesses_bae146/.
